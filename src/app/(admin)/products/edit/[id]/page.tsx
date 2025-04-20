@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { productApi } from "@/services/api";
+import { productApi, categoryApi, Category } from "@/services/api";
 
 // Import các section components
 import OverviewSection from "../../create/components/sections/OverviewSection";
@@ -71,6 +71,9 @@ interface FormState {
   // Custom code section
   customHtmlHead: string;
   customHtmlBody: string;
+
+  slug: string;
+  status: 'ACTIVE' | 'INACTIVE';
 }
 
 export default function EditProductPage() {
@@ -79,6 +82,7 @@ export default function EditProductPage() {
   const id = params.id as string;
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [formState, setFormState] = React.useState<FormState>({
     // Overview section
     gameCode: "",
@@ -133,81 +137,93 @@ export default function EditProductPage() {
     // Custom code section
     customHtmlHead: "",
     customHtmlBody: "",
+    
+    slug: "",
+    status: 'ACTIVE',
   });
 
   useEffect(() => {
-    loadProduct();
-  }, []);
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        const [productData, fetchedCategories] = await Promise.all([
+          productApi.getById(id),
+          categoryApi.getAllAdmin()
+        ]);
+        
+        console.log('Product data from server:', productData);
+        console.log('Categories from server:', fetchedCategories);
+        
+        setCategories(fetchedCategories);
+        
+        setFormState({
+          // Overview section
+          gameCode: productData.gameCode || "",
+          analyticsCode: productData.analyticsCode || "",
+          productName: productData.name || "",
+          requirePhoneNumber: productData.requirePhone || false,
+          shortSummary: productData.shortDescription || "",
+          fullDescription: productData.description || "",
+          warrantyPolicy: productData.warrantyPolicy || "",
+          faq: productData.faq || "",
+          metaTitle: productData.metaTitle || "",
+          metaDescription: productData.metaDescription || "",
+          mainKeyword: productData.mainKeyword || "",
+          secondaryKeywords: productData.secondaryKeywords || [],
+          tags: productData.tags || [],
+          
+          // Popup notification section
+          enablePopup: productData.popupEnabled || false,
+          popupTitle: productData.popupTitle || "",
+          popupContent: productData.popupContent || "",
+          
+          // Product data section
+          guideUrl: productData.guideUrl || "",
+          imageUrl: productData.imageUrl || "",
+          originalPrice: productData.originalPrice || 0,
+          importPrice: productData.importPrice || 0,
+          importSource: productData.importSource || "",
+          quantity: productData.quantity || 0,
+          autoSyncQuantity: productData.autoSyncQuantityWithKey || false,
+          minQuantity: productData.minPerOrder || 1,
+          maxQuantity: productData.maxPerOrder || 0,
+          autoDeliverKey: productData.autoDeliverKey || true,
+          showReadMore: productData.showMoreDescription || false,
+          enablePromotion: productData.promotionEnabled || false,
+          lowStockThreshold: productData.lowStockWarning || 5,
+          gameKeyDisplayText: productData.gameKeyText || "",
+          instructionalText: productData.guideText || "",
+          expiryDays: productData.expiryDays || 30,
+          allowComments: productData.allowComment || true,
+          
+          // Linking section
+          productCategory: productData.categoryId || "",
+          relatedProducts: [],
+          additionalRequirements: productData.additionalRequirementIds || [],
+          
+          // Promotion section
+          promotionPrice: productData.promotionPrice || 0,
+          promotionStartDate: productData.promotionStartDate || null,
+          promotionEndDate: productData.promotionEndDate || null,
+          promotionQuantity: productData.promotionQuantity || 0,
+          
+          // Custom code section
+          customHtmlHead: productData.customHeadCode || "",
+          customHtmlBody: productData.customBodyCode || "",
+          
+          slug: productData.slug || "",
+          status: productData.status || 'ACTIVE',
+        });
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        toast.error('Không thể tải thông tin sản phẩm hoặc danh mục');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const loadProduct = async () => {
-    try {
-      setLoading(true);
-      console.log('Loading product with ID:', id);
-      const data = await productApi.getById(id);
-      console.log('Product data from server:', data);
-      
-      setFormState({
-        // Overview section
-        gameCode: data.gameCode || "",
-        analyticsCode: data.analyticsCode || "",
-        productName: data.name || "",
-        requirePhoneNumber: data.requirePhone || false,
-        shortSummary: data.shortDescription || "",
-        fullDescription: data.description || "",
-        warrantyPolicy: data.warrantyPolicy || "",
-        faq: data.faq || "",
-        metaTitle: data.metaTitle || "",
-        metaDescription: data.metaDescription || "",
-        mainKeyword: data.mainKeyword || "",
-        secondaryKeywords: data.secondaryKeywords || [],
-        tags: data.tags || [],
-        
-        // Popup notification section
-        enablePopup: data.popupEnabled || false,
-        popupTitle: data.popupTitle || "",
-        popupContent: data.popupContent || "",
-        
-        // Product data section
-        guideUrl: data.guideUrl || "",
-        imageUrl: data.imageUrl || "",
-        originalPrice: data.originalPrice || 0,
-        importPrice: data.importPrice || 0,
-        importSource: data.importSource || "",
-        quantity: data.quantity || 0,
-        autoSyncQuantity: data.autoSyncQuantityWithKey || false,
-        minQuantity: data.minPerOrder || 1,
-        maxQuantity: data.maxPerOrder || 0,
-        autoDeliverKey: data.autoDeliverKey || true,
-        showReadMore: data.showMoreDescription || false,
-        enablePromotion: data.promotionEnabled || false,
-        lowStockThreshold: data.lowStockWarning || 5,
-        gameKeyDisplayText: data.gameKeyText || "",
-        instructionalText: data.guideText || "",
-        expiryDays: data.expiryDays || 30,
-        allowComments: data.allowComment || true,
-        
-        // Linking section
-        productCategory: data.categoryId || "",
-        relatedProducts: [],
-        additionalRequirements: data.additionalRequirementIds || [],
-        
-        // Promotion section
-        promotionPrice: data.promotionPrice || 0,
-        promotionStartDate: data.promotionStartDate || null,
-        promotionEndDate: data.promotionEndDate || null,
-        promotionQuantity: data.promotionQuantity || 0,
-        
-        // Custom code section
-        customHtmlHead: data.customHeadCode || "",
-        customHtmlBody: data.customBodyCode || "",
-      });
-    } catch (error) {
-      console.error('Error loading product:', error);
-      toast.error('Không thể tải thông tin sản phẩm');
-    } finally {
-      setLoading(false);
-    }
-  };
+    loadInitialData();
+  }, [id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,7 +240,7 @@ export default function EditProductPage() {
       // Chuẩn bị dữ liệu để gửi lên API theo cấu trúc trong API.md
       const productData = {
         name: formState.productName,
-        slug: formState.productName.toLowerCase().replace(/\s+/g, '-'),
+        slug: formState.slug,
         gameCode: formState.gameCode,
         analyticsCode: formState.analyticsCode,
         requirePhone: formState.requirePhoneNumber,
@@ -271,12 +287,13 @@ export default function EditProductPage() {
         additionalRequirementIds: formState.additionalRequirements,
         
         customHeadCode: formState.customHtmlHead,
-        customBodyCode: formState.customHtmlBody
+        customBodyCode: formState.customHtmlBody,
+
+        status: formState.status,
       };
       
-      console.log('Sending data to server:', productData);
-      const response = await productApi.update(id, productData);
-      console.log('Server response:', response);
+      console.log('Sending product data to API:', productData);
+      await productApi.update(id, productData);
       
       toast.success("Cập nhật sản phẩm thành công!");
       router.push('/products');
@@ -353,6 +370,7 @@ export default function EditProductPage() {
               <LinkingSection 
                 formState={formState} 
                 updateFormState={updateFormState} 
+                categories={categories}
               />
             </TabsContent>
 

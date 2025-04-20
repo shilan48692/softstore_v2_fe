@@ -16,8 +16,7 @@ export default function LoginPage() {
       try {
         setIsLoading(true);
         
-        // Gửi authorization code lên backend
-        const res = await fetch('http://localhost:3000/admin/auth/google/login', {
+        const fetchOptions: RequestInit = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -25,7 +24,13 @@ export default function LoginPage() {
           body: JSON.stringify({
             code: codeResponse.code,
           }),
-        });
+          credentials: 'include', 
+        };
+        
+        console.log('>>> Fetching with options:', JSON.stringify(fetchOptions, null, 2)); // LOG OPTIONS
+        
+        // Gửi authorization code lên backend
+        const res = await fetch('http://localhost:3000/admin/auth/google/login', fetchOptions);
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({ message: 'Login request failed' }));
@@ -34,12 +39,12 @@ export default function LoginPage() {
 
         const data = await res.json();
         
-        if (!data.accessToken || !data.admin) {
-          throw new Error('Invalid response format from backend');
+        // Kiểm tra xem có thông tin admin trả về không (token giờ được set qua cookie)
+        if (!data.admin) {
+          throw new Error('Invalid response format from backend (missing admin info)');
         }
 
-        // Lưu accessToken và thông tin admin vào localStorage
-        localStorage.setItem('accessToken', data.accessToken);
+        // Lưu thông tin admin vào localStorage (vẫn cần thiết nếu muốn hiển thị thông tin user trên UI)
         localStorage.setItem('admin', JSON.stringify(data.admin));
         
         toast.success('Đăng nhập thành công!');
@@ -51,7 +56,8 @@ export default function LoginPage() {
         setIsLoading(false);
       }
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Google Login Error:', error);
       toast.error('Có lỗi xảy ra khi đăng nhập với Google.');
     },
   });

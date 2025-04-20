@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   Package, 
   Key, 
@@ -12,8 +12,20 @@ import {
   Menu, 
   X,
   ChevronRight,
-  Home
+  Home,
+  LogOut
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import apiClient from '@/services/api';
 import { cn } from '@/lib/utils';
 
 interface SidebarItem {
@@ -51,9 +63,28 @@ const sidebarItems: SidebarItem[] = [
   },
 ];
 
+interface AdminInfo {
+  fullName?: string;
+  email?: string;
+}
+
 const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [adminInfo, setAdminInfo] = useState<AdminInfo | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    const storedAdmin = localStorage.getItem('admin');
+    if (storedAdmin) {
+      try {
+        setAdminInfo(JSON.parse(storedAdmin));
+      } catch (e) {
+        console.error("Failed to parse admin info from localStorage", e);
+        localStorage.removeItem('admin');
+      }
+    }
+  }, []);
 
   // Tạo breadcrumb từ pathname
   const breadcrumbs = pathname.split('/').filter(Boolean);
@@ -75,6 +106,25 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const pageTitle = breadcrumbs.length > 0 
     ? getPageTitle(breadcrumbs[breadcrumbs.length - 1])
     : 'Trang Chủ';
+
+  const handleSignOut = async () => {
+    try {
+      await apiClient.post('/admin/auth/logout');
+      
+      localStorage.removeItem('admin');
+      setAdminInfo(null);
+      
+      router.push('/login');
+      
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+  
+  const getInitials = (name?: string) => {
+      if (!name) return '?';
+      return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -188,12 +238,35 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           </div>
           
-          {/* User Menu (placeholder) */}
-          <div className="flex items-center">
-            <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-medium">
-              A
-            </div>
-          </div>
+          {/* User Menu Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>
+                    {adminInfo ? getInitials(adminInfo.fullName) : 'A'}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {adminInfo?.fullName || 'Admin'}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {adminInfo?.email || 'admin@example.com'}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sign out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Page Content */}

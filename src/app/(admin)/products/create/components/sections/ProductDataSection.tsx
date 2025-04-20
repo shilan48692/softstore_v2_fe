@@ -55,12 +55,13 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
               />
             </div>
             <div>
-              <Label htmlFor="originalPrice">Giá Gốc</Label>
+              <Label htmlFor="originalPrice">Giá Gốc <span className="text-red-500">*</span></Label>
               <Input
                 id="originalPrice"
                 type="number"
                 value={formState.originalPrice}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ originalPrice: parseFloat(e.target.value) })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ originalPrice: parseFloat(e.target.value) || 0 })}
+                required
               />
             </div>
             <div>
@@ -84,12 +85,13 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="quantity">Số Lượng</Label>
+              <Label htmlFor="quantity">Số Lượng <span className="text-red-500">*</span></Label>
               <Input
                 id="quantity"
                 type="number"
                 value={formState.quantity}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ quantity: parseInt(e.target.value) })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ quantity: parseInt(e.target.value) || 0 })}
+                required
               />
             </div>
             <div className="flex items-center space-x-2">

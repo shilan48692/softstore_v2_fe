@@ -1,11 +1,12 @@
 'use client';
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
+import { categoryApi, Category } from "@/services/api";
 
 // Import các section components
 import OverviewSection from "./components/sections/OverviewSection";
@@ -64,6 +65,9 @@ interface FormState {
   customHtmlHead: string;
   customHtmlBody: string;
 
+  slug: string;
+  status: 'ACTIVE' | 'INACTIVE';
+
   // Additional properties
   importSource: string;
   quantity: number;
@@ -81,6 +85,7 @@ interface FormState {
 }
 
 const CreateProductPage = () => {
+  const [categories, setCategories] = useState<Category[]>([]);
   const [formState, setFormState] = React.useState<FormState>({
     // Overview section
     gameCode: "",
@@ -144,7 +149,17 @@ const CreateProductPage = () => {
     instructionalText: "",
     expiryDays: 0,
     allowComments: false,
+    status: 'ACTIVE',
+    slug: "",
   });
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      const fetchedCategories = await categoryApi.getAllAdmin();
+      setCategories(fetchedCategories);
+    };
+    loadCategories();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,6 +220,7 @@ const CreateProductPage = () => {
               <LinkingSection 
                 formState={formState} 
                 updateFormState={updateFormState} 
+                categories={categories}
               />
             </TabsContent>
 

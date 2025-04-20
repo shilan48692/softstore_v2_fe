@@ -8,28 +8,8 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Cho phép gửi cookies trong request
+  withCredentials: true, // Rất quan trọng: Cho phép gửi/nhận cookies cross-origin/same-origin
 });
-
-// Thêm interceptor để tự động thêm token vào header
-apiClient.interceptors.request.use(
-  (config) => {
-    console.log('[Request Interceptor] Running for URL:', config.url);
-    const token = localStorage.getItem('accessToken');
-    console.log('[Request Interceptor] Token from localStorage:', token);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-      console.log('[Request Interceptor] Authorization header added.');
-    } else {
-      console.log('[Request Interceptor] No token found in localStorage.');
-    }
-    return config;
-  },
-  (error) => {
-    console.error('[Request Interceptor] Error:', error);
-    return Promise.reject(error);
-  }
-);
 
 // Thêm interceptor để xử lý lỗi (bao gồm lỗi 401 Unauthorized)
 apiClient.interceptors.response.use(
@@ -37,14 +17,14 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response) {
       console.error('API Error:', error.response.data);
-      // Nếu lỗi là 401 (Unauthorized), xóa token và redirect về trang login
+      // Nếu lỗi là 401 (Unauthorized), xóa thông tin admin và redirect về trang login
+      // Việc xóa cookie HttpOnly phải được thực hiện bởi backend bằng cách gửi lại header Set-Cookie với thời gian hết hạn trong quá khứ.
       if (error.response.status === 401) {
-        console.log('[Response Interceptor] Unauthorized (401). Removing token and redirecting to login.');
-        localStorage.removeItem('accessToken');
+        console.log('[Response Interceptor] Unauthorized (401). Removing local admin info and redirecting to login.');
         localStorage.removeItem('admin');
-        // Chỉ thực hiện redirect nếu đang ở phía client
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login'; // Hoặc sử dụng router nếu có
+        // Chỉ thực hiện redirect nếu đang ở phía client và không phải đang ở trang login rồi
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.href = '/login'; // Redirect về login
         }
       }
     } else if (error.request) {
@@ -108,25 +88,73 @@ export interface Product {
   customHeadCode: string;
   customBodyCode: string;
   
+  status: 'ACTIVE' | 'INACTIVE';
+  
   createdAt: string;
   updatedAt: string;
+  category?: { name: string };
+}
+
+// Thêm interface cho Pagination Meta
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+// Thêm interface cho Response của API search
+export interface AdminProductSearchResponse {
+  data: Product[];
+  meta: PaginationMeta;
+}
+
+// Thêm interface cho Category
+export interface Category {
+  id: string;
+  name: string;
+}
+
+// Thêm interface cho các tham số tìm kiếm
+export interface AdminProductSearchParams {
+  search?: string;
+  status?: 'ACTIVE' | 'INACTIVE' | ''; // Thêm chuỗi rỗng để reset filter
+  categoryId?: string;
+  minQuantity?: number | ''; // Dùng chuỗi rỗng để dễ xử lý input trống
+  maxQuantity?: number | '';
+  minPrice?: number | '';
+  maxPrice?: number | '';
+  page?: number;
+  limit?: number;
+  sortBy?: 'name' | 'createdAt' | 'updatedAt' | 'originalPrice' | 'quantity' | 'status';
+  sortOrder?: 'ASC' | 'DESC';
 }
 
 export const productApi = {
-  getAll: async (params?: {
-    name?: string;
-    categoryId?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    inStock?: boolean;
-    tags?: string[];
-  }) => {
+  searchPublic: async (params?: { name?: string }) => {
     try {
       const response = await apiClient.get<Product[]>('/products', { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error fetching public products:', error);
       throw error;
+    }
+  },
+
+  searchAdmin: async (params?: AdminProductSearchParams) => {
+    try {
+      const filteredParams = Object.entries(params || {})
+        .filter(([_, value]) => value !== undefined && value !== '')
+        .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+        
+      console.log("Calling /admin/products/search with params:", filteredParams);
+      const response = await apiClient.get<AdminProductSearchResponse>('/admin/products/search', { 
+        params: filteredParams 
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error searching admin products:', error);
+      return { data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } };
     }
   },
 
@@ -140,7 +168,7 @@ export const productApi = {
     }
   },
 
-  create: async (data: Omit<Product, 'id' | 'slug' | 'createdAt' | 'updatedAt'>) => {
+  create: async (data: Omit<Product, 'id' | 'slug' | 'createdAt' | 'updatedAt' | 'category'>) => {
     try {
       const response = await apiClient.post<Product>('/admin/products', data);
       return response.data;
@@ -150,7 +178,7 @@ export const productApi = {
     }
   },
 
-  update: async (id: string, data: Partial<Product>) => {
+  update: async (id: string, data: Partial<Omit<Product, 'category'>>) => {
     try {
       console.log('Updating product:', id, data);
       const response = await apiClient.patch<Product>(`/admin/products/${id}`, data);
@@ -168,6 +196,20 @@ export const productApi = {
     } catch (error) {
       console.error('Error deleting product:', error);
       throw error;
+    }
+  },
+};
+
+// (Optional) Có thể tạo một object API riêng cho categories
+export const categoryApi = {
+  getAllAdmin: async (): Promise<Category[]> => {
+    try {
+      const response = await apiClient.get<Category[]>('/admin/categories');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      // Trả về mảng rỗng nếu lỗi
+      return []; 
     }
   },
 };
