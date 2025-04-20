@@ -1,21 +1,14 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import AdminLayout from "@/components/layouts/AdminLayout";
+import { Toaster } from "sonner";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Trình Quản Lý Sản Phẩm",
-  description: "Hệ thống quản lý sản phẩm tự động",
+  title: "Admin Console",
+  description: "Admin Console for SoftStore",
 };
 
 export default function RootLayout({
@@ -24,11 +17,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className="dam--signed-in">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="en" className="dam--signed-in">
+      <body className={inter.className}>
         <AdminLayout>{children}</AdminLayout>
+        <Toaster />
       </body>
     </html>
   );

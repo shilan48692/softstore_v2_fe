@@ -20,11 +20,19 @@ export default function ProductsPage() {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await productApi.getAll({ name: searchTerm });
-      console.log('Products data:', data);
-      setProducts(data);
+      const response = await productApi.getAll({ name: searchTerm });
+      console.log('API Response:', response);
+      console.log('Response type:', typeof response);
+      console.log('Is Array:', Array.isArray(response));
+      
+      // Đảm bảo response là một mảng
+      const productsArray = Array.isArray(response) ? response : response.data || [];
+      console.log('Products array:', productsArray);
+      
+      setProducts(productsArray);
     } catch (error) {
       console.error('Error loading products:', error);
+      setProducts([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
