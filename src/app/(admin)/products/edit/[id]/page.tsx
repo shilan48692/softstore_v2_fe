@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -142,88 +142,114 @@ export default function EditProductPage() {
     status: 'ACTIVE',
   });
 
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        setLoading(true);
-        const [productData, fetchedCategories] = await Promise.all([
-          productApi.getById(id),
-          categoryApi.getAllAdmin()
-        ]);
-        
-        console.log('Product data from server:', productData);
-        console.log('Categories from server:', fetchedCategories);
-        
-        setCategories(fetchedCategories);
-        
-        setFormState({
-          // Overview section
-          gameCode: productData.gameCode || "",
-          analyticsCode: productData.analyticsCode || "",
-          productName: productData.name || "",
-          requirePhoneNumber: productData.requirePhone || false,
-          shortSummary: productData.shortDescription || "",
-          fullDescription: productData.description || "",
-          warrantyPolicy: productData.warrantyPolicy || "",
-          faq: productData.faq || "",
-          metaTitle: productData.metaTitle || "",
-          metaDescription: productData.metaDescription || "",
-          mainKeyword: productData.mainKeyword || "",
-          secondaryKeywords: productData.secondaryKeywords || [],
-          tags: productData.tags || [],
-          
-          // Popup notification section
-          enablePopup: productData.popupEnabled || false,
-          popupTitle: productData.popupTitle || "",
-          popupContent: productData.popupContent || "",
-          
-          // Product data section
-          guideUrl: productData.guideUrl || "",
-          imageUrl: productData.imageUrl || "",
-          originalPrice: productData.originalPrice || 0,
-          importPrice: productData.importPrice || 0,
-          importSource: productData.importSource || "",
-          quantity: productData.quantity || 0,
-          autoSyncQuantity: productData.autoSyncQuantityWithKey || false,
-          minQuantity: productData.minPerOrder || 1,
-          maxQuantity: productData.maxPerOrder || 0,
-          autoDeliverKey: productData.autoDeliverKey || true,
-          showReadMore: productData.showMoreDescription || false,
-          enablePromotion: productData.promotionEnabled || false,
-          lowStockThreshold: productData.lowStockWarning || 5,
-          gameKeyDisplayText: productData.gameKeyText || "",
-          instructionalText: productData.guideText || "",
-          expiryDays: productData.expiryDays || 30,
-          allowComments: productData.allowComment || true,
-          
-          // Linking section
-          productCategory: productData.categoryId || "",
-          relatedProducts: [],
-          additionalRequirements: productData.additionalRequirementIds || [],
-          
-          // Promotion section
-          promotionPrice: productData.promotionPrice || 0,
-          promotionStartDate: productData.promotionStartDate || null,
-          promotionEndDate: productData.promotionEndDate || null,
-          promotionQuantity: productData.promotionQuantity || 0,
-          
-          // Custom code section
-          customHtmlHead: productData.customHeadCode || "",
-          customHtmlBody: productData.customBodyCode || "",
-          
-          slug: productData.slug || "",
-          status: productData.status || 'ACTIVE',
-        });
-      } catch (error) {
-        console.error('Error loading initial data:', error);
-        toast.error('Không thể tải thông tin sản phẩm hoặc danh mục');
-      } finally {
-        setLoading(false);
+  const loadInitialData = async () => {
+    try {
+      setLoading(true);
+      // Promise.all now returns [ApiResponse<Product>, ApiResponse<Category[]>] 
+      const [productResponse, categoriesResponse] = await Promise.all([
+        productApi.getById(id),
+        categoryApi.getAllAdmin()
+      ]);
+      
+      console.log('Product API response:', productResponse);
+      console.log('Categories API response:', categoriesResponse);
+      
+      // Check if API calls were successful before accessing data
+      if (!productResponse?.success || !categoriesResponse?.success) {
+          const errorMsg = productResponse?.message || categoriesResponse?.message || 'Lỗi không xác định từ API.';
+          console.error("API call failed:", errorMsg);
+          toast.error(`Không thể tải dữ liệu: ${errorMsg}`);
+          setLoading(false);
+          return;
       }
-    };
+      
+      // Access data correctly using response.data
+      const actualProductData = productResponse.data;
+      const validCategories = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [];
+      
+      setCategories(validCategories);
+      
+      // Check if actualProductData exists (should be guaranteed by success check, but good practice)
+      if (!actualProductData) {
+          console.error("Product data is unexpectedly missing after success check");
+          toast.error('Dữ liệu sản phẩm trả về không hợp lệ (sau kiểm tra thành công).');
+          setLoading(false);
+          return;
+      }
+      
+      // Set form state using actualProductData
+      setFormState({
+        // Overview section
+        gameCode: actualProductData.gameCode || "",
+        analyticsCode: actualProductData.analyticsCode || "",
+        productName: actualProductData.name || "",
+        requirePhoneNumber: actualProductData.requirePhone || false,
+        shortSummary: actualProductData.shortDescription || "",
+        fullDescription: actualProductData.description || "",
+        warrantyPolicy: actualProductData.warrantyPolicy || "",
+        faq: actualProductData.faq || "",
+        metaTitle: actualProductData.metaTitle || "",
+        metaDescription: actualProductData.metaDescription || "",
+        mainKeyword: actualProductData.mainKeyword || "",
+        secondaryKeywords: actualProductData.secondaryKeywords || [],
+        tags: actualProductData.tags || [],
+        
+        // Popup notification section
+        enablePopup: actualProductData.popupEnabled || false,
+        popupTitle: actualProductData.popupTitle || "",
+        popupContent: actualProductData.popupContent || "",
+        
+        // Product data section
+        guideUrl: actualProductData.guideUrl || "",
+        imageUrl: actualProductData.imageUrl || "",
+        originalPrice: actualProductData.originalPrice || 0,
+        importPrice: actualProductData.importPrice || 0,
+        importSource: actualProductData.importSource || "",
+        quantity: actualProductData.quantity || 0,
+        autoSyncQuantity: actualProductData.autoSyncQuantityWithKey || false,
+        minQuantity: actualProductData.minPerOrder || 1,
+        maxQuantity: actualProductData.maxPerOrder === null ? 0 : (actualProductData.maxPerOrder || 0),
+        autoDeliverKey: actualProductData.autoDeliverKey || true,
+        showReadMore: actualProductData.showMoreDescription || false,
+        enablePromotion: actualProductData.promotionEnabled || false,
+        lowStockThreshold: actualProductData.lowStockWarning || 5,
+        gameKeyDisplayText: actualProductData.gameKeyText || "",
+        instructionalText: actualProductData.guideText || "",
+        expiryDays: actualProductData.expiryDays || 30,
+        allowComments: actualProductData.allowComment || true,
+        
+        // Linking section
+        productCategory: actualProductData.categoryId || "",
+        relatedProducts: [],
+        additionalRequirements: actualProductData.additionalRequirementIds || [],
+        
+        // Promotion section
+        promotionPrice: actualProductData.promotionPrice === null ? 0 : (actualProductData.promotionPrice || 0),
+        promotionStartDate: actualProductData.promotionStartDate || null,
+        promotionEndDate: actualProductData.promotionEndDate || null,
+        promotionQuantity: actualProductData.promotionQuantity === null ? 0 : (actualProductData.promotionQuantity || 0),
+        
+        // Custom code section
+        customHtmlHead: actualProductData.customHeadCode || "",
+        customHtmlBody: actualProductData.customBodyCode || "",
+        
+        slug: actualProductData.slug || "",
+        status: actualProductData.status || 'ACTIVE',
+      });
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+      // Display error message from the caught error if available
+      const errorMsg = (error as any)?.response?.data?.message || (error as Error)?.message || 'Lỗi không xác định';
+      toast.error(`Không thể tải thông tin: ${errorMsg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadInitialData();
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,7 +294,7 @@ export default function EditProductPage() {
         quantity: formState.quantity,
         autoSyncQuantityWithKey: formState.autoSyncQuantity,
         minPerOrder: formState.minQuantity,
-        maxPerOrder: formState.maxQuantity || null,
+        maxPerOrder: formState.maxQuantity ? formState.maxQuantity : 10,
         autoDeliverKey: formState.autoDeliverKey,
         showMoreDescription: formState.showReadMore,
         promotionEnabled: formState.enablePromotion,
@@ -305,12 +331,12 @@ export default function EditProductPage() {
     }
   };
 
-  const updateFormState = (data: Partial<typeof formState>) => {
+  const updateFormState = useCallback((data: Partial<typeof formState>) => {
     setFormState(prev => ({
       ...prev,
       ...data
     }));
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -348,43 +374,55 @@ export default function EditProductPage() {
             <TabsContent value="overview">
               <OverviewSection 
                 formState={formState} 
-                updateFormState={updateFormState} 
+                updateFormState={(data: Partial<FormState>) => {
+                    setFormState(prevState => ({ ...prevState, ...data }));
+                }}
               />
             </TabsContent>
 
             <TabsContent value="product-data">
               <ProductDataSection 
                 formState={formState} 
-                updateFormState={updateFormState} 
+                updateFormState={(data: Partial<FormState>) => {
+                    setFormState(prevState => ({ ...prevState, ...data }));
+                }}
               />
             </TabsContent>
 
             <TabsContent value="promotion">
               <PromotionSection 
                 formState={formState} 
-                updateFormState={updateFormState} 
+                updateFormState={(data: Partial<FormState>) => {
+                    setFormState(prevState => ({ ...prevState, ...data }));
+                }}
               />
             </TabsContent>
 
             <TabsContent value="linking">
               <LinkingSection 
                 formState={formState} 
-                updateFormState={updateFormState} 
                 categories={categories}
+                updateFormState={(data: Partial<FormState>) => {
+                    setFormState(prevState => ({ ...prevState, ...data }));
+                }}
               />
             </TabsContent>
 
             <TabsContent value="popup">
               <PopupNotificationSection 
                 formState={formState} 
-                updateFormState={updateFormState} 
+                updateFormState={(data: Partial<FormState>) => {
+                    setFormState(prevState => ({ ...prevState, ...data }));
+                }}
               />
             </TabsContent>
 
             <TabsContent value="custom-code">
               <CustomCodeSection 
                 formState={formState} 
-                updateFormState={updateFormState} 
+                updateFormState={(data: Partial<FormState>) => {
+                    setFormState(prevState => ({ ...prevState, ...data }));
+                }}
               />
             </TabsContent>
           </Tabs>

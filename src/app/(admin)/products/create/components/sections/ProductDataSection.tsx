@@ -6,6 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import dynamic from 'next/dynamic';
+
+// Dynamic import for RichTextEditor
+const RichTextEditor = dynamic(
+  () => import('@/components/RichTextEditor/RichTextEditor').then(mod => mod.RichTextEditor),
+  { ssr: false, loading: () => <p>Loading Editor...</p> } 
+);
 
 interface FormState {
   guideUrl: string;
@@ -33,6 +40,26 @@ interface ProductDataSectionProps {
 }
 
 const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, updateFormState }) => {
+
+  const handleNumberChange = (key: keyof FormState, value: string) => {
+      const num = value === '' ? 0 : parseInt(value, 10);
+      if (!isNaN(num) && num >= 0) {
+          updateFormState({ [key]: num } as Partial<FormState>);
+      }
+  };
+
+  const handleMaxQuantityChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    if (rawValue === '') {
+        updateFormState({ maxQuantity: 0 });
+        return;
+    }
+    const value = parseInt(rawValue, 10);
+    if (!isNaN(value) && value >= 0) {
+        updateFormState({ maxQuantity: value });
+    }
+  };
+
   return (
     <Card>
       <CardContent className="space-y-6 p-6">
@@ -60,7 +87,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
                 id="originalPrice"
                 type="number"
                 value={formState.originalPrice}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ originalPrice: parseFloat(e.target.value) || 0 })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('originalPrice', e.target.value)}
                 required
               />
             </div>
@@ -70,7 +97,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
                 id="importPrice"
                 type="number"
                 value={formState.importPrice}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ importPrice: parseFloat(e.target.value) })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('importPrice', e.target.value)}
               />
             </div>
             <div>
@@ -90,7 +117,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
                 id="quantity"
                 type="number"
                 value={formState.quantity}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ quantity: parseInt(e.target.value) || 0 })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('quantity', e.target.value)}
                 required
               />
             </div>
@@ -98,7 +125,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
               <Switch
                 id="autoSyncQuantity"
                 checked={formState.autoSyncQuantity}
-                onCheckedChange={(checked) => updateFormState({ autoSyncQuantity: checked })}
+                onCheckedChange={(checked: boolean) => updateFormState({ autoSyncQuantity: checked })}
               />
               <Label htmlFor="autoSyncQuantity">Tự Động Đồng Bộ Số Lượng</Label>
             </div>
@@ -108,7 +135,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
                 id="minQuantity"
                 type="number"
                 value={formState.minQuantity}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ minQuantity: parseInt(e.target.value) })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('minQuantity', e.target.value)}
               />
             </div>
             <div>
@@ -116,8 +143,8 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
               <Input
                 id="maxQuantity"
                 type="number"
-                value={formState.maxQuantity}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ maxQuantity: parseInt(e.target.value) })}
+                value={formState.maxQuantity ? String(formState.maxQuantity) : '10'}
+                onChange={handleMaxQuantityChange}
               />
             </div>
           </div>
@@ -128,7 +155,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
             <Switch
               id="autoDeliverKey"
               checked={formState.autoDeliverKey}
-              onCheckedChange={(checked) => updateFormState({ autoDeliverKey: checked })}
+              onCheckedChange={(checked: boolean) => updateFormState({ autoDeliverKey: checked })}
             />
             <Label htmlFor="autoDeliverKey">Tự Động Giao Key</Label>
           </div>
@@ -136,7 +163,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
             <Switch
               id="showReadMore"
               checked={formState.showReadMore}
-              onCheckedChange={(checked) => updateFormState({ showReadMore: checked })}
+              onCheckedChange={(checked: boolean) => updateFormState({ showReadMore: checked })}
             />
             <Label htmlFor="showReadMore">Hiển Thị Xem Thêm</Label>
           </div>
@@ -144,7 +171,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
             <Switch
               id="enablePromotion"
               checked={formState.enablePromotion}
-              onCheckedChange={(checked) => updateFormState({ enablePromotion: checked })}
+              onCheckedChange={(checked: boolean) => updateFormState({ enablePromotion: checked })}
             />
             <Label htmlFor="enablePromotion">Bật Khuyến Mãi</Label>
           </div>
@@ -154,7 +181,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
               id="lowStockThreshold"
               type="number"
               value={formState.lowStockThreshold}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ lowStockThreshold: parseInt(e.target.value) })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('lowStockThreshold', e.target.value)}
             />
           </div>
         </div>
@@ -170,10 +197,11 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
           </div>
           <div>
             <Label htmlFor="instructionalText">Văn Bản Hướng Dẫn</Label>
-            <Textarea
-              id="instructionalText"
-              value={formState.instructionalText}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateFormState({ instructionalText: e.target.value })}
+            <RichTextEditor
+              initialContent={formState.instructionalText}
+              onChange={(htmlContent) => {
+                updateFormState({ instructionalText: htmlContent });
+              }}
             />
           </div>
           <div>
@@ -182,14 +210,14 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
               id="expiryDays"
               type="number"
               value={formState.expiryDays}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ expiryDays: parseInt(e.target.value) })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('expiryDays', e.target.value)}
             />
           </div>
           <div className="flex items-center space-x-2">
             <Switch
               id="allowComments"
               checked={formState.allowComments}
-              onCheckedChange={(checked) => updateFormState({ allowComments: checked })}
+              onCheckedChange={(checked: boolean) => updateFormState({ allowComments: checked })}
             />
             <Label htmlFor="allowComments">Cho Phép Bình Luận</Label>
           </div>

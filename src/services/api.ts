@@ -36,6 +36,14 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Define a generic API response structure
+export interface ApiResponse<T> {
+  success: boolean;
+  statusCode: number;
+  message: string | null;
+  data: T;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -158,9 +166,9 @@ export const productApi = {
     }
   },
 
-  getById: async (id: string) => {
+  getById: async (id: string): Promise<ApiResponse<Product>> => {
     try {
-      const response = await apiClient.get<Product>(`/products/${id}`);
+      const response = await apiClient.get<ApiResponse<Product>>(`/products/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching product:', error);
@@ -198,18 +206,42 @@ export const productApi = {
       throw error;
     }
   },
+
+  searchByName: async (name: string): Promise<Pick<Product, 'id' | 'name'>[]> => {
+    try {
+      // Define the expected response structure
+      interface SearchResponse {
+        data: Pick<Product, 'id' | 'name'>[];
+        meta: any; // Or define meta structure if needed
+      }
+      
+      console.log(`[API] Searching products by name: ${name}`);
+      const response = await apiClient.get<SearchResponse>('/products', {
+        params: { name: name, limit: 10 } // Search by name, limit results
+      });
+      console.log(`[API] Search response received:`, response.data);
+      // Return the nested data array
+      return response.data.data || []; 
+    } catch (error) {
+      console.error('Error searching products by name:', error);
+      // Return empty array in case of error to prevent breaking the component
+      return []; 
+    }
+  },
 };
 
 // (Optional) Có thể tạo một object API riêng cho categories
 export const categoryApi = {
-  getAllAdmin: async (): Promise<Category[]> => {
+  getAllAdmin: async (): Promise<ApiResponse<Category[]>> => {
     try {
-      const response = await apiClient.get<Category[]>('/admin/categories');
+      const response = await apiClient.get<ApiResponse<Category[]>>('/admin/categories');
       return response.data;
     } catch (error) {
       console.error('Error fetching categories:', error);
-      // Trả về mảng rỗng nếu lỗi
-      return []; 
+      // Trả về một cấu trúc lỗi phù hợp nếu API không thành công
+      // Hoặc throw error để component cha xử lý
+      throw error; // Re-throw error instead of returning empty array directly
+      // return { success: false, statusCode: 500, message: 'Error fetching categories', data: [] }; // Alternative: return error structure
     }
   },
 };

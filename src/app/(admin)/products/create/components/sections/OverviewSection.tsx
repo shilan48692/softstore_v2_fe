@@ -13,6 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+// import { RichTextEditor } from '@/components/RichTextEditor/RichTextEditor'; // Comment out static import
+import dynamic from 'next/dynamic';
+
+// Dynamic import for RichTextEditor
+const RichTextEditor = dynamic(
+  () => import('@/components/RichTextEditor/RichTextEditor').then(mod => mod.RichTextEditor),
+  { ssr: false, loading: () => <p>Loading Editor...</p> } // Disable SSR and add a loading state
+);
 
 // Helper function to generate slug
 const generateSlug = (str: string): string => {
@@ -53,6 +61,7 @@ interface OverviewSectionProps {
 }
 
 const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateFormState }) => {
+  console.log("OverviewSection received formState:", formState);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
 
   // Auto-generate slug when productName changes, if not manually edited
@@ -158,11 +167,11 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
             </div>
             <div>
               <Label htmlFor="fullDescription">Mô Tả Đầy Đủ</Label>
-              <Textarea
-                id="fullDescription"
-                value={formState.fullDescription}
-                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateFormState({ fullDescription: e.target.value })}
-                className="min-h-[100px]"
+              <RichTextEditor
+                initialContent={formState.fullDescription}
+                onChange={(htmlContent) => {
+                  updateFormState({ fullDescription: htmlContent });
+                }}
               />
             </div>
           </div>
@@ -171,18 +180,20 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
         <div className="space-y-4">
           <div>
             <Label htmlFor="warrantyPolicy">Chính Sách Bảo Hành</Label>
-            <Textarea
-              id="warrantyPolicy"
-              value={formState.warrantyPolicy}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateFormState({ warrantyPolicy: e.target.value })}
+            <RichTextEditor
+              initialContent={formState.warrantyPolicy}
+              onChange={(htmlContent) => {
+                updateFormState({ warrantyPolicy: htmlContent });
+              }}
             />
           </div>
           <div>
             <Label htmlFor="faq">Câu Hỏi Thường Gặp</Label>
-            <Textarea
-              id="faq"
-              value={formState.faq}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateFormState({ faq: e.target.value })}
+            <RichTextEditor
+              initialContent={formState.faq}
+              onChange={(htmlContent) => {
+                updateFormState({ faq: htmlContent });
+              }}
             />
           </div>
         </div>

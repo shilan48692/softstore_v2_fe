@@ -6,6 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import dynamic from 'next/dynamic';
+
+// Dynamic import for RichTextEditor
+const RichTextEditor = dynamic(
+  () => import('@/components/RichTextEditor/RichTextEditor').then(mod => mod.RichTextEditor),
+  { ssr: false, loading: () => <p>Loading Editor...</p> } 
+);
 
 interface FormState {
   enablePopup: boolean;
@@ -36,18 +43,18 @@ const PopupNotificationSection: React.FC<PopupNotificationSectionProps> = ({ for
             <Input
               id="popupTitle"
               value={formState.popupTitle}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ popupTitle: e.target.value })}
+              onChange={(e) => updateFormState({ popupTitle: e.target.value })}
               disabled={!formState.enablePopup}
             />
           </div>
           <div>
             <Label htmlFor="popupContent">Nội Dung Popup</Label>
-            <Textarea
-              id="popupContent"
-              value={formState.popupContent}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateFormState({ popupContent: e.target.value })}
+            <RichTextEditor
+              initialContent={formState.popupContent}
+              onChange={(htmlContent) => {
+                updateFormState({ popupContent: htmlContent });
+              }}
               disabled={!formState.enablePopup}
-              className="min-h-[100px]"
             />
           </div>
         </div>
