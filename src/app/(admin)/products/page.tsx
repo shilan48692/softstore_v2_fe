@@ -18,8 +18,11 @@ import {
 } from "@/components/ui/pagination";
 import { Package, Search, Plus, Edit, RotateCcw, Check, X } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
+import { Skeleton } from "@/components/ui/skeleton";
+import { ProductCard } from '@/components/admin/ProductCard';
 
 // Helper function for debounce
 function useDebounce<T>(value: T, delay: number): T {
@@ -83,13 +86,14 @@ export default function ProductsPage() {
       const response = await productApi.searchAdmin(params);
       console.log('API Response:', response);
       if (response && response.data) {
+        if (response.data.length > 0) {
+            console.log('First product data sample:', response.data[0]);
+        }
         setProducts(response.data || []);
         setPaginationMeta(response.meta || { total: 0, page: params.page || 1, limit: params.limit || 9, totalPages: 0 });
       } else {
          setProducts([]);
          setPaginationMeta({ total: 0, page: params.page || 1, limit: params.limit || 9, totalPages: 0 });
-         // Optionally show a toast message if response format is unexpected
-         // toast.error("Lỗi định dạng dữ liệu sản phẩm từ server.");
       }
     } catch (error: any) {
       console.error('Error loading products:', error);
@@ -103,11 +107,24 @@ export default function ProductsPage() {
 
   const loadCategories = useCallback(async () => {
     try {
-        const fetchedCategories = await categoryApi.getAllAdmin();
-        setCategories(fetchedCategories || []);
+        const apiResponse = await categoryApi.getAllAdmin(); // Get the full ApiResponse object
+        // Check if the request was successful and data is an array
+        if (apiResponse && apiResponse.success && Array.isArray(apiResponse.data)) {
+             setCategories(apiResponse.data);
+        } else {
+             console.warn('Received unexpected category data format or API error:', apiResponse);
+             setCategories([]); // Set to empty array if data is invalid or request failed
+             if (apiResponse && !apiResponse.success) {
+                toast.error(`Lỗi tải danh mục: ${apiResponse.message || 'Lỗi không rõ từ API'}`);
+             }
+        }
     } catch (error: any) {
+        // Catch errors from the API call itself (network, 401 handled by interceptor, etc.)
         console.error('Error loading categories:', error);
-        toast.error(`Lỗi tải danh mục: ${error?.response?.data?.message || error.message || 'Lỗi không xác định'}`);
+        // Toast error might be redundant if interceptor handles 401, but good for other network errors
+        if (error.response?.status !== 401) {
+             toast.error(`Lỗi tải danh mục: ${error?.response?.data?.message || error.message || 'Lỗi không xác định'}`);
+        }
         setCategories([]);
     }
   }, []);
@@ -243,237 +260,209 @@ export default function ProductsPage() {
     { value: 'status', label: 'Trạng thái' },
   ];
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Danh Sách Sản Phẩm ({paginationMeta.total || 0})</h1>
-        <Link href="/products/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm Sản Phẩm
-          </Button>
-        </Link>
+  // Skeleton component for loading state
+  const ProductCardSkeleton = () => (
+    <Card className="flex items-start gap-4 p-4 rounded-xl shadow-sm">
+      <Skeleton className="w-24 h-20 rounded-md" /> {/* Image Skeleton */}
+      <div className="flex-grow space-y-2">
+        <Skeleton className="h-5 w-3/4" /> {/* Name Skeleton */}
+        <Skeleton className="h-4 w-1/4" /> {/* Code Skeleton */}
+        <Skeleton className="h-4 w-1/2" /> {/* Price Skeleton */}
+        <Skeleton className="h-4 w-1/3" /> {/* Stock Skeleton */}
       </div>
+      <div className="flex flex-col items-end space-y-2">
+        <Skeleton className="h-5 w-20" /> {/* Status Skeleton */}
+        <Skeleton className="h-8 w-8 rounded-full" /> {/* Edit Button Skeleton */}
+      </div>
+    </Card>
+  );
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Bộ lọc và Sắp xếp</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <Input
-              placeholder="Tìm kiếm tên, mã game..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="md:col-span-1"
-            />
-            <Select 
-              value={filters.status}
-              onValueChange={(value) => handleSelectFilterChange('status', value === 'ALL' ? '' : value as 'ACTIVE' | 'INACTIVE')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Lọc theo trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tất cả trạng thái</SelectItem>
-                <SelectItem value="ACTIVE">Đang hoạt động</SelectItem>
-                <SelectItem value="INACTIVE">Ngừng hoạt động</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select 
-              value={filters.categoryId || 'ALL'} 
-              onValueChange={(value) => handleSelectFilterChange('categoryId', value === 'ALL' ? '' : value)}
-              disabled={categories.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Lọc theo danh mục" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tất cả danh mục</SelectItem>
-                 {Array.isArray(categories) && categories.length > 0 && categories.map(cat => (
-                   <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                 ))}
-              </SelectContent>
-            </Select>
+  return (
+    <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
+      <Card className="mb-8">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl font-bold flex items-center">
+              <Package className="mr-2 h-6 w-6" />
+              Danh sách Sản phẩm ({paginationMeta?.total || 0})
+            </CardTitle>
+            <div className="flex items-center space-x-2">
+               <Button variant="outline" size="icon" onClick={handleResetFilters} title="Làm mới bộ lọc">
+                 <RotateCcw className="h-4 w-4" />
+                 <span className="sr-only">Làm mới</span>
+               </Button>
+              <Button asChild>
+                <Link href="/admin/products/create">
+                  <Plus className="mr-2 h-4 w-4" /> Thêm Sản phẩm
+                </Link>
+              </Button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
-             <div className="flex flex-col gap-1">
-                <Label className="text-sm">Khoảng giá</Label>
-                <div className="flex gap-2">
-                   <Input 
-                     type="number" 
-                     placeholder="Từ" 
-                     value={minPriceInput}
-                     onChange={(e) => setMinPriceInput(e.target.value)}
-                     className="h-9"
-                   />
-                   <Input 
-                     type="number" 
-                     placeholder="Đến" 
-                     value={maxPriceInput}
-                     onChange={(e) => setMaxPriceInput(e.target.value)}
-                     className="h-9"
-                   />
-                 </div>
-             </div>
-              <div className="flex flex-col gap-1">
-                <Label className="text-sm">Khoảng số lượng</Label>
-                <div className="flex gap-2">
-                  <Input 
-                    type="number" 
-                    placeholder="Từ" 
-                    value={minQuantityInput}
-                    onChange={(e) => setMinQuantityInput(e.target.value)}
-                    className="h-9"
-                  />
-                  <Input 
-                    type="number" 
-                    placeholder="Đến" 
-                    value={maxQuantityInput}
-                    onChange={(e) => setMaxQuantityInput(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
+        </CardHeader>
+        <CardContent>
+          {/* Filter Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6 items-end">
+            {/* Search Input */}
+            <div className="space-y-1">
+              <Label htmlFor="search">Tìm kiếm</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="search"
+                  type="search"
+                  placeholder="Tên, mã sản phẩm..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-8"
+                />
               </div>
-              <div className="flex flex-col gap-1">
-                 <Label htmlFor="sortBy" className="text-sm">Sắp xếp theo</Label>
-                 <Select 
-                   value={filters.sortBy} 
-                   onValueChange={(value) => handleSelectFilterChange('sortBy', value as AdminProductSearchParams['sortBy'])}
-                 >
-                   <SelectTrigger id="sortBy" className="h-9">
-                     <SelectValue placeholder="Chọn trường sắp xếp" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     {sortOptions.map(option => (
-                       <SelectItem key={option.value} value={option.value!}>{option.label}</SelectItem>
-                     ))}
-                   </SelectContent>
-                 </Select>
+            </div>
+
+            {/* Category Select */}
+            <div className="space-y-1">
+              <Label htmlFor="category">Danh mục</Label>
+              <Select
+                value={filters.categoryId || ''}
+                onValueChange={(value) => handleSelectFilterChange('categoryId', value === 'all' ? '' : value)}
+              >
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Chọn danh mục" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả danh mục</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id.toString()}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status Select */}
+            <div className="space-y-1">
+              <Label htmlFor="status">Trạng thái</Label>
+              <Select
+                value={filters.status || ''}
+                onValueChange={(value) => handleSelectFilterChange('status', value === 'all' ? '' : value)}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Chọn trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="active">Hoạt động</SelectItem>
+                  <SelectItem value="inactive">Không hoạt động</SelectItem>
+                   {/* Add other relevant statuses */}
+                </SelectContent>
+              </Select>
+            </div>
+            
+             {/* Price Range */}
+            <div className="space-y-1 md:col-span-1">
+              <Label>Khoảng giá</Label>
+              <div className="flex gap-2">
+                 <Input
+                   type="number"
+                   placeholder="Từ"
+                   value={minPriceInput}
+                   onChange={(e) => setMinPriceInput(e.target.value)}
+                   min="0"
+                   aria-label="Giá tối thiểu"
+                 />
+                 <Input
+                   type="number"
+                   placeholder="Đến"
+                   value={maxPriceInput}
+                   onChange={(e) => setMaxPriceInput(e.target.value)}
+                   min="0"
+                   aria-label="Giá tối đa"
+                 />
               </div>
-              <div className="flex gap-2 items-end">
-                  <Select 
-                    value={filters.sortOrder} 
-                    onValueChange={(value) => handleSelectFilterChange('sortOrder', value as 'ASC' | 'DESC')}
-                  >
-                    <SelectTrigger className="h-9 w-[120px]">
-                      <SelectValue placeholder="Thứ tự" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ASC">Tăng dần</SelectItem>
-                      <SelectItem value="DESC">Giảm dần</SelectItem>
-                    </SelectContent>
-                  </Select>
-                   <Button variant="outline" onClick={handleResetFilters} className="h-9 flex-1">
-                      <RotateCcw className="mr-2 h-4 w-4" /> Reset
-                  </Button>
+            </div>
+
+            {/* Quantity Range */}
+            <div className="space-y-1 md:col-span-1">
+              <Label>Tồn kho</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="Từ"
+                  value={minQuantityInput}
+                  onChange={(e) => setMinQuantityInput(e.target.value)}
+                   min="0"
+                   aria-label="Số lượng tồn tối thiểu"
+                />
+                 <Input
+                   type="number"
+                   placeholder="Đến"
+                   value={maxQuantityInput}
+                   onChange={(e) => setMaxQuantityInput(e.target.value)}
+                   min="0"
+                   aria-label="Số lượng tồn tối đa"
+                 />
               </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Product List */}
+      {/* Product Grid */}
       {loading ? (
-        <div className="text-center py-8">Đang tải sản phẩm...</div>
-      ) : products.length === 0 ? (
-        <div className="text-center py-8">Không tìm thấy sản phẩm nào phù hợp.</div>
+         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {/* Render skeletons based on limit */}
+           {Array.from({ length: filters.limit || 9 }).map((_, index) => (
+             <ProductCardSkeleton key={`skeleton-${index}`} />
+           ))}
+         </div>
+      ) : products.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+           {products.map((product) => (
+             <ProductCard key={product.id} product={product} />
+           ))}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map((product) => (
-            <Card key={product.id} className="hover:shadow-md transition-shadow duration-200 flex flex-col">
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-base font-semibold line-clamp-2 flex-1 mr-2">{product.name}</CardTitle>
-                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Link href={`/products/edit/${product.id}`} legacyBehavior>
-                         <a className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700">
-                            <Edit className="h-4 w-4" />
-                         </a>
-                      </Link>
-                      {getStatusBadge(product.status || '')}
-                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-2 flex-grow flex flex-col justify-between">
-                  <div className="mb-3">
-                     <p className="text-xs text-gray-500 mb-1">Mã game: {product.gameCode || 'N/A'}</p>
-                     <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium">{formatPrice(product.originalPrice)}</span>
-                        <span className={`text-xs font-medium ${product.quantity <= (product.lowStockWarning || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                           Còn: {product.quantity}
-                        </span>
-                     </div>
-                     {product.promotionEnabled && product.promotionPrice && (
-                         <p className="text-xs text-red-600">KM: {formatPrice(product.promotionPrice)}</p>
-                     )}
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-1 mt-auto border-t pt-2">
-                    {product.tags?.slice(0, 3).map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs font-normal">{tag}</Badge>
-                    ))}
-                    {product.tags?.length > 3 && <Badge variant="secondary" className="text-xs font-normal">...</Badge>}
-                  </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="text-center py-10 text-gray-500">
+          <Package className="mx-auto h-12 w-12 mb-4" />
+          <p>Không tìm thấy sản phẩm nào phù hợp.</p>
         </div>
       )}
 
       {/* Pagination */}
-      {paginationMeta.totalPages > 1 && (
-         <Pagination>
-           <PaginationContent>
-             <PaginationItem>
-               <PaginationPrevious 
-                 href="#"
-                 onClick={(e) => { e.preventDefault(); handlePageChange(paginationMeta.page - 1); }}
-                 aria-disabled={paginationMeta.page <= 1}
-                 className={paginationMeta.page <= 1 ? "pointer-events-none opacity-50" : undefined}
-               />
-             </PaginationItem>
-             
-             {/* Logic to display pagination numbers (simplified) */}
-             {Array.from({ length: paginationMeta.totalPages }, (_, i) => i + 1)
-              // Limit displayed pages for brevity if many pages exist
-              .filter(page => 
-                  page === 1 || 
-                  page === paginationMeta.totalPages || 
-                  (page >= paginationMeta.page - 1 && page <= paginationMeta.page + 1)
-              )
-              .map((page, index, arr) => {
-                const showEllipsis = index > 0 && page !== arr[index-1] + 1;
-                return (
-                 <React.Fragment key={`page-${page}`}>
-                    {showEllipsis && (
-                       <PaginationItem key={`ellipsis-before-${page}`}>
-                         <PaginationEllipsis />
-                       </PaginationItem>
-                    )}
-                    <PaginationItem>
-                       <PaginationLink 
-                         href="#" 
-                         isActive={page === paginationMeta.page}
-                         onClick={(e) => { e.preventDefault(); handlePageChange(page); }}
-                       >
-                         {page}
-                       </PaginationLink>
-                    </PaginationItem>
-                 </React.Fragment>
-                )
-              })
-             }
-
-             <PaginationItem>
-               <PaginationNext 
-                 href="#"
-                 onClick={(e) => { e.preventDefault(); handlePageChange(paginationMeta.page + 1); }}
-                 aria-disabled={paginationMeta.page >= paginationMeta.totalPages}
-                 className={paginationMeta.page >= paginationMeta.totalPages ? "pointer-events-none opacity-50" : undefined}
-               />
-             </PaginationItem>
-           </PaginationContent>
-         </Pagination>
+      {!loading && paginationMeta && paginationMeta.totalPages > 1 && (
+         <div className="mt-8 flex justify-center">
+           <Pagination>
+             <PaginationContent>
+               <PaginationItem>
+                 <PaginationPrevious
+                   href="#"
+                   onClick={(e) => { e.preventDefault(); handlePageChange(paginationMeta.page - 1); }}
+                   className={paginationMeta.page <= 1 ? "pointer-events-none opacity-50" : undefined}
+                 />
+               </PaginationItem>
+               {/* Logic to render page numbers - simplified for brevity */}
+               {Array.from({ length: paginationMeta.totalPages }, (_, i) => i + 1).map(pageNumber => (
+                 <PaginationItem key={pageNumber}>
+                   <PaginationLink
+                     href="#"
+                     onClick={(e) => { e.preventDefault(); handlePageChange(pageNumber); }}
+                     isActive={paginationMeta.page === pageNumber}
+                   >
+                     {pageNumber}
+                   </PaginationLink>
+                 </PaginationItem>
+               ))}
+               {/* Consider adding Ellipsis logic for many pages */}
+               <PaginationItem>
+                 <PaginationNext
+                   href="#"
+                   onClick={(e) => { e.preventDefault(); handlePageChange(paginationMeta.page + 1); }}
+                   className={paginationMeta.page >= paginationMeta.totalPages ? "pointer-events-none opacity-50" : undefined}
+                 />
+               </PaginationItem>
+             </PaginationContent>
+           </Pagination>
+         </div>
       )}
     </div>
   );

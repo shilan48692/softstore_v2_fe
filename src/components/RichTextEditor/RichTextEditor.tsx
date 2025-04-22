@@ -19,7 +19,6 @@ import { common, createLowlight } from 'lowlight';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import CustomImage from './extensions/CustomImage';
 import Placeholder from '@tiptap/extension-placeholder';
-import ImageEditMenu from './ImageEditMenu';
 
 import { Toolbar } from './Toolbar';
 import './editor-styles.css';
@@ -40,68 +39,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialContent =
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadFile = async (file: File) => {
-    const editorInstance = editor;
-    if (!editorInstance || editorInstance.isDestroyed || isUploading) return;
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
-        toast.error('Loại file không hợp lệ. Chỉ chấp nhận JPG, PNG, GIF.');
-        return;
-    }
-    const maxSizeMB = 10;
-    if (file.size > maxSizeMB * 1024 * 1024) {
-        toast.error(`Kích thước file quá lớn. Tối đa là ${maxSizeMB}MB.`);
-        return;
-    }
-
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const token = localStorage.getItem('token'); 
-      if (!token) {
-        throw new Error('Authentication token not found.');
-      }
-      const headers: HeadersInit = { 'Authorization': `Bearer ${token}` };
-
-      const response = await fetch('/api/upload', { method: 'POST', headers: headers, body: formData });
-
-      if (!response.ok) {
-        let errorMsg = 'Upload failed';
-        try { const errorData = await response.json(); errorMsg = errorData.error || `Upload failed with status: ${response.status}`; } 
-        catch (e) { errorMsg = `Upload failed with status: ${response.status}`; }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
-      if (data.url && editorInstance && !editorInstance.isDestroyed) {
-        editorInstance.chain().focus().setImage({ src: data.url }).run();
-        toast.success('Ảnh đã được tải lên!');
-      } else {
-        throw new Error('Invalid response from server or editor not ready');
-      }
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      toast.error(error.message || 'Tải ảnh lên thất bại.');
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) { fileInputRef.current.value = ''; }
-    }
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      uploadFile(event.target.files[0]);
-    }
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
   const editor = useEditor({
+    content: initialContent,
     extensions: [
       StarterKit.configure({
         codeBlock: false,
@@ -125,17 +64,17 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialContent =
       Highlight.configure({ multicolor: true }),
       Underline,
     ],
-    content: initialContent,
-    editable: !disabled,
+    editable: !disabled && !isHtmlMode,
     editorProps: {
       handlePaste: (view, event, slice) => {
-        if (event.clipboardData && event.clipboardData.files && event.clipboardData.files.length > 0) {
-          const file = event.clipboardData.files[0];
-          if (file.type.startsWith('image/')) {
-            event.preventDefault();
-            uploadFile(file);
-            return true;
-          }
+        if (!editor || isHtmlMode || !event.clipboardData || !event.clipboardData.files || event.clipboardData.files.length === 0) {
+          return false;
+        }
+        const file = event.clipboardData.files[0];
+        if (file.type.startsWith('image/')) {
+          event.preventDefault();
+          uploadFile(file);
+          return true;
         }
         return false;
       },
@@ -147,49 +86,127 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialContent =
     onUpdate: ({ editor }) => {
       if (!isHtmlMode && !disabled) {
         const currentHtml = editor.getHTML();
+        setHtmlContent(currentHtml);
         onChange(currentHtml);
       }
     },
-  });
+  }, [disabled, isHtmlMode, placeholder]);
 
-  const toggleHtmlMode = useCallback(() => {
-    if (!editor || editor.isDestroyed) return;
-    const currentlyHtml = !isHtmlMode;
-    if (currentlyHtml) {
-        const currentEditorHtml = editor.getHTML();
-        setHtmlContent(currentEditorHtml);
-        editor.setEditable(false);
-    } else {
-        editor.commands.setContent(htmlContent, false);
-        editor.setEditable(!disabled);
+  const uploadFile = async (file: File) => {
+    if (!editor || editor.isDestroyed || isUploading) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+        toast.error('Loại file không hợp lệ. Chỉ chấp nhận JPG, PNG, GIF.');
+        return;
     }
-    setIsHtmlMode(currentlyHtml);
-  }, [editor, isHtmlMode, disabled, htmlContent]);
+    const maxSizeMB = 10;
+    if (file.size > maxSizeMB * 1024 * 1024) {
+        toast.error(`Kích thước file quá lớn. Tối đa là ${maxSizeMB}MB.`);
+        return;
+    }
 
-  useEffect(() => {
-    if (!editor || editor.isDestroyed) return;
-    if (initialContent && !isHtmlMode) {
-      const currentEditorHtml = editor.getHTML();
-      if (initialContent !== currentEditorHtml) {
-        editor.commands.setContent(initialContent, false);
-        setHtmlContent(initialContent);
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found.');
       }
-    }
-    if (!isHtmlMode) {
-       editor.setEditable(!disabled);
-    } else {
-       editor.setEditable(false);
-    }
-  }, [initialContent, editor, isHtmlMode, disabled]);
+      const headers: HeadersInit = { 'Authorization': `Bearer ${token}` };
 
-  const handleHtmlChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const newHtml = event.target.value;
-      setHtmlContent(newHtml);
-      onChange(newHtml); 
+      const response = await fetch('/api/upload', { method: 'POST', headers: headers, body: formData });
+
+      if (!response.ok) {
+        let errorMsg = 'Upload failed';
+        try { const errorData = await response.json(); errorMsg = errorData.error || `Upload failed with status: ${response.status}`; }
+        catch (e) { errorMsg = `Upload failed with status: ${response.status}`; }
+        throw new Error(errorMsg);
+      }
+
+      const data = await response.json();
+      if (data.url && editor && !editor.isDestroyed) {
+        editor.chain().focus().setImage({ src: data.url }).run();
+        toast.success('Ảnh đã được tải lên!');
+      } else {
+        throw new Error('Invalid response from server or editor not ready');
+      }
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error(error.message || 'Tải ảnh lên thất bại.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) { fileInputRef.current.value = ''; }
+    }
   };
 
-  if (!editor) {
-    return null;
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      uploadFile(event.target.files[0]);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  const toggleHtmlMode = useCallback(() => {
+    const currentlyHtml = !isHtmlMode;
+    if (currentlyHtml) {
+      if (editor && !editor.isDestroyed) {
+        setHtmlContent(editor.getHTML());
+      }
+      setIsHtmlMode(true);
+    } else {
+      setIsHtmlMode(false);
+    }
+  }, [editor, isHtmlMode]);
+
+  useEffect(() => {
+    if (!isHtmlMode && editor && !editor.isDestroyed) {
+       const currentEditorHtml = editor.getHTML();
+       if (htmlContent !== currentEditorHtml) {
+         console.log('[RichTextEditor] Restoring content from htmlContent:', htmlContent);
+         setTimeout(() => {
+            if (editor && !editor.isDestroyed) {
+                 editor.commands.setContent(htmlContent, false);
+            }
+         }, 0);
+       }
+       editor.setEditable(!disabled);
+    }
+  }, [isHtmlMode, editor, htmlContent, disabled]);
+
+  useEffect(() => {
+    if (!isHtmlMode && editor && !editor.isDestroyed) {
+      const currentEditorHtml = editor.getHTML();
+      if (initialContent !== currentEditorHtml && initialContent !== htmlContent) {
+         console.log("External initialContent changed, updating editor.");
+         setHtmlContent(initialContent);
+         editor.commands.setContent(initialContent, false);
+      }
+    }
+    else if (isHtmlMode && initialContent !== htmlContent) {
+        setHtmlContent(initialContent);
+    }
+  }, [initialContent]);
+
+  useEffect(() => {
+    return () => {
+        // Optional: console.log('RichTextEditor unmounting');
+    };
+  }, []);
+
+  const handleHtmlChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newHtml = event.target.value;
+    setHtmlContent(newHtml);
+    onChange(newHtml);
+  };
+
+  if (!isHtmlMode && !editor) {
+    return <div>Loading editor...</div>;
   }
 
   return (
@@ -197,50 +214,49 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialContent =
         "border border-input rounded-md",
         disabled && "bg-gray-100 dark:bg-gray-800 opacity-70"
         )}>
-      <Toolbar 
-        editor={editor} 
-        isHtmlMode={isHtmlMode} 
+      <Toolbar
+        editor={editor}
+        isHtmlMode={isHtmlMode}
         toggleHtmlMode={toggleHtmlMode}
         triggerFileInput={triggerFileInput}
         isUploading={isUploading}
       />
-      
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-        style={{ display: 'none' }} 
-        accept="image/*" 
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+        accept="image/*"
       />
 
-      <EditorContent 
-        editor={editor} 
-        className={cn(
-          "min-h-[300px] p-4", 
-          'prose dark:prose-invert max-w-full focus:outline-none',
-          isHtmlMode && 'hidden'
-        )}
-      />
-      <Textarea
-        value={htmlContent}
-        onChange={handleHtmlChange}
-        disabled={disabled}
-        className={cn(
-            "min-h-[300px] p-4 font-mono text-sm rounded-t-none border-0 focus:outline-none focus-visible:ring-0 w-full box-border",
-            !isHtmlMode && 'hidden'
-        )}
-        placeholder="Edit HTML code..."
-      />
+      {!isHtmlMode && editor && (
+        <EditorContent
+          editor={editor}
+          className="min-h-[300px] p-4 prose dark:prose-invert max-w-full focus:outline-none"
+        />
+      )}
 
-      {!isHtmlMode && !disabled && editor && !editor.isDestroyed && (
+      {isHtmlMode && (
+        <Textarea
+          value={htmlContent}
+          onChange={handleHtmlChange}
+          disabled={disabled}
+          className="min-h-[300px] p-4 font-mono text-sm rounded-t-none border-0 focus:outline-none focus-visible:ring-0 w-full box-border"
+          placeholder="Edit HTML code..."
+        />
+      )}
+
+      {/* Conditionally render BubbleMenu - REMOVED */}
+      {/* {!isHtmlMode && !disabled && editor && !editor.isDestroyed && (
         <BubbleMenu
           editor={editor}
           tippyOptions={{ duration: 100, zIndex: 50 }}
-          shouldShow={({ editor }) => editor.isActive('customImage')}
+          shouldShow={({ editor: currentEditor }) => currentEditor?.isActive('customImage') ?? false}
         >
-          <ImageEditMenu editor={editor} />
+          <ImageEditMenu editor={editor} /> 
         </BubbleMenu>
-      )}
+      )} */}
     </div>
   );
 };

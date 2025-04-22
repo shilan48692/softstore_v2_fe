@@ -176,6 +176,21 @@ export const productApi = {
     }
   },
 
+  getBySlug: async (slug: string): Promise<ApiResponse<Product>> => {
+    try {
+      console.log(`[API] Fetching product by slug: ${slug}`);
+      const response = await apiClient.get<ApiResponse<Product>>(`/products/by-slug/${slug}`);
+      console.log(`[API] Product data received for slug ${slug}:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching product by slug ${slug}:`, error);
+      // Re-throw the error or return a specific error structure
+      throw error;
+      // Example of returning error structure:
+      // return { success: false, statusCode: error.response?.status || 500, message: error.message, data: null };
+    }
+  },
+
   create: async (data: Omit<Product, 'id' | 'slug' | 'createdAt' | 'updatedAt' | 'category'>) => {
     try {
       const response = await apiClient.post<Product>('/admin/products', data);

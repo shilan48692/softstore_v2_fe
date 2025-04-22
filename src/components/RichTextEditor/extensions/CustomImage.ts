@@ -66,41 +66,55 @@ export const CustomImage = Image.extend({
       },
       align: { // Add align attribute
         default: 'left', // Default alignment
-        renderHTML: (attributes) => {
-          // Handled in renderHTML wrapper below
-          return {}
-        },
         parseHTML: (element) => element.style.float || element.getAttribute('data-align') || 'left',
       },
     }
   },
 
   renderHTML({ HTMLAttributes }) {
-    const { align, ...otherAttributes } = HTMLAttributes
-    let finalAttributes = otherAttributes
-    let style = otherAttributes.style || ''
-    const classes = ['custom-image'] // Base class for styling
+    const { align, class: currentClass, style: currentStyle, ...otherAttributes } = HTMLAttributes;
 
-    // Clean up existing float/display styles before applying alignment
-    style = style.replace(/float\s*:\s*(left|right|center|none)\s*;?/gi, '')
-    style = style.replace(/display\s*:\s*block\s*;?/gi, '')
-    style = style.replace(/margin\s*:\s*auto\s*;?/gi, '') // Remove margin auto if setting float
+    let finalAttributes = { ...otherAttributes };
 
+    // --- Class Handling --- 
+    let otherClasses = (currentClass || '').split(' ').filter((c: string) => c && c.trim() && !c.startsWith('align-') && c !== 'custom-image');
+    let finalClasses = ['custom-image', ...otherClasses]; 
+    
+    // --- Style Handling ---
+    let style = currentStyle || '';
+
+    // Clean up existing float/display/margin styles from inline style attribute
+    style = style.replace(/float\s*:\s*(left|right|none)\s*;?/gi, '');
+    style = style.replace(/display\s*:\s*block\s*;?/gi, '');
+    style = style.replace(/margin-left\s*:\s*auto\s*;?/gi, '');
+    style = style.replace(/margin-right\s*:\s*auto\s*;?/gi, '');
+    style = style.replace(/;\s*;/g, ';'); 
+    style = style.trim().replace(/^;|;$/g, ''); 
+
+    let appliedStyle = style ? style + (style.endsWith(';') ? '' : ';') : '';
+
+    // Apply alignment via style and add class
     if (align === 'left') {
-      style += ' float: left;'
-      classes.push('align-left')
+      appliedStyle += ' float: left;';
+      finalClasses.push('align-left');
     } else if (align === 'right') {
-      style += ' float: right;'
-      classes.push('align-right')
+      appliedStyle += ' float: right;';
+      finalClasses.push('align-right');
     } else if (align === 'center') {
-      style += ' display: block; margin-left: auto; margin-right: auto;'
-      classes.push('align-center')
-    }
-    finalAttributes.style = style.trim()
-    finalAttributes.class = (finalAttributes.class ? finalAttributes.class + ' ' : '') + classes.join(' ')
-    finalAttributes['data-align'] = align // Store alignment for parsing
+      appliedStyle += ' display: block; margin-left: auto; margin-right: auto;';
+      finalClasses.push('align-center');
+    } 
 
-    return ['img', mergeAttributes(finalAttributes)]
+    // Assign final class and style
+    finalAttributes.class = finalClasses.filter((c: string) => c && c.trim()).join(' ').trim(); 
+    finalAttributes.style = appliedStyle.trim().replace(/^;|;$/g, ''); 
+    if (!finalAttributes.style) {
+        delete finalAttributes.style; 
+    }
+
+    finalAttributes['data-align'] = align; 
+
+    return ['img', mergeAttributes(finalAttributes)];
   },
 
   parseHTML() {
@@ -108,19 +122,48 @@ export const CustomImage = Image.extend({
       {
         tag: 'img[src]:not([src^="data:"])',
         getAttrs: (dom) => {
-            if (typeof dom === 'string') return {};
-            const element = dom as HTMLImageElement;
-            const align = element.style.float || element.getAttribute('data-align') || 'left';
-            return {
-                src: element.getAttribute('src'),
-                alt: element.getAttribute('alt'),
-                title: element.getAttribute('title'),
-                width: element.getAttribute('width'),
-                height: element.getAttribute('height'),
-                class: element.getAttribute('class'),
-                style: element.getAttribute('style'),
-                align: align
-            };
+          if (typeof dom === 'string') return {};
+          const element = dom as HTMLImageElement;
+
+          let determinedAlign: 'left' | 'center' | 'right' | null = null; 
+          const dataAlign = element.getAttribute('data-align');
+          const floatStyle = element.style.float;
+          const displayStyle = element.style.display;
+          const marginLeftStyle = element.style.marginLeft;
+          const marginRightStyle = element.style.marginRight;
+
+          if (dataAlign === 'left' || dataAlign === 'center' || dataAlign === 'right') {
+            determinedAlign = dataAlign;
+          } else if (floatStyle === 'left') {
+            determinedAlign = 'left';
+          } else if (floatStyle === 'right') {
+            determinedAlign = 'right';
+          } else if (displayStyle === 'block' && marginLeftStyle === 'auto' && marginRightStyle === 'auto') {
+            determinedAlign = 'center';
+          }
+          
+          interface ImageAttributes {
+            src: string | null;
+            alt: string | null;
+            title: string | null;
+            width: string | null;
+            height: string | null;
+            class: string | null;
+            style: string | null;
+            align: 'left' | 'center' | 'right' | null;
+          }
+
+          const attrs: ImageAttributes = {
+            src: element.getAttribute('src'),
+            alt: element.getAttribute('alt'),
+            title: element.getAttribute('title'),
+            width: element.getAttribute('width'),
+            height: element.getAttribute('height'),
+            class: element.getAttribute('class'),
+            style: element.getAttribute('style'),
+            align: determinedAlign 
+          };
+          return attrs;
         },
       },
     ]
