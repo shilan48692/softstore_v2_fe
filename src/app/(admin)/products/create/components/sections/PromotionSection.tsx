@@ -5,7 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { FormState, FormUpdateCallback } from '@/app/(admin)/products/edit/[slug]/page';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FormState, FormUpdateCallback } from '@/types/productForm';
 
 interface PromotionSectionProps {
   formState: FormState;
@@ -13,10 +14,10 @@ interface PromotionSectionProps {
 }
 
 // Helper function to format Date or ISO String to YYYY-MM-DDTHH:mm
-const formatDateForInput = (dateStringOrNull: string | null): string => {
-  if (!dateStringOrNull) return '';
+const formatDateForInput = (dateString: string | null | undefined): string => {
+  if (!dateString) return '';
   try {
-    const date = new Date(dateStringOrNull);
+    const date = new Date(dateString);
     if (isNaN(date.getTime())) return ''; // Handle invalid date string
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -25,7 +26,7 @@ const formatDateForInput = (dateStringOrNull: string | null): string => {
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   } catch (e) {
-    console.error("Error formatting date for input:", dateStringOrNull, e);
+    console.error("Error formatting date for input:", dateString, e);
     return '';
   }
 };
@@ -92,20 +93,10 @@ const PromotionSection: React.FC<PromotionSectionProps> = ({ formState, updateFo
   };
 
   // Handler for date input changes
-  const handleDateChange = (key: 'promotionStartDate' | 'promotionEndDate', value: string) => {
-    // The value from datetime-local is already in YYYY-MM-DDTHH:mm format or empty
-    // We need to convert it back to ISO string or null for the main formState
-    if (value === '') {
-      updateFormState({ [key]: null });
-    } else {
-      try {
-        const date = new Date(value); // Parse the local time string
-        updateFormState({ [key]: date.toISOString() }); // Store as ISO string
-      } catch (e) {
-        console.error("Error parsing date input:", value, e);
-        updateFormState({ [key]: null }); // Set to null if parsing fails
-      }
-    }
+  const handleDateChange = (field: 'promotionStartDate' | 'promotionEndDate', value: string) => {
+    // Input value is '' or a valid datetime-local string
+    // Convert '' to null for the state
+    updateFormState({ [field]: value === '' ? null : value });
   };
 
   return (

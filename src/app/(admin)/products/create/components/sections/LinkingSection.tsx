@@ -17,7 +17,7 @@ import {
 import { Category, productApi, Product, ApiResponse } from "@/services/api";
 import { useDebounce } from './useDebounce';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FormState, FormUpdateCallback } from '@/app/(admin)/products/edit/[slug]/page';
+import { FormState, FormUpdateCallback } from '@/types/productForm';
 
 interface SelectedProduct {
   id: string;

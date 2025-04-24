@@ -19,60 +19,48 @@ import PromotionSection from "@/app/(admin)/products/create/components/sections/
 import CustomCodeSection from "@/app/(admin)/products/create/components/sections/CustomCodeSection";
 import StatusSection from "@/app/(admin)/products/create/components/sections/StatusSection";
 
-// Define the canonical FormState based on API Product type + form needs
-export interface FormState {
-  name?: string;
-  slug?: string;
-  gameCode?: string;
-  analyticsCode?: string;
-  requirePhone?: boolean;
-  shortDescription?: string;
-  description?: string; // For Rich Text Editor
-  warrantyPolicy?: string; // For Rich Text Editor
-  faq?: string; // For Rich Text Editor
-  metaTitle?: string;
-  metaDescription?: string;
-  mainKeyword?: string;
-  secondaryKeywords?: string[];
-  tags?: string[];
-  popupEnabled?: boolean;
-  popupTitle?: string;
-  popupContent?: string;
-  guideUrl?: string;
-  imageUrl?: string;
-  originalPrice?: number | ''; // Allow empty string for input
-  importPrice?: number | '';   // Allow empty string for input
-  importSource?: string;
-  quantity?: number | '';     // Allow empty string for input
-  autoSyncQuantityWithKey?: boolean;
-  minPerOrder?: number | '';    // Allow empty string for input
-  maxPerOrder?: number | null | ''; // Allow null and empty string
-  autoDeliverKey?: boolean;
-  showMoreDescription?: boolean;
-  promotionEnabled?: boolean;
-  lowStockWarning?: number | null | ''; // Allow null and empty string
-  gameKeyText?: string;
-  guideText?: string; // For Rich Text Editor
-  expiryDays?: number | null | ''; // Allow null and empty string
-  allowComment?: boolean;
-  promotionPrice?: number | null | ''; // Allow null and empty string
-  promotionStartDate?: string | null; // Date string or null
-  promotionEndDate?: string | null;   // Date string or null
-  promotionQuantity?: number | null | ''; // Allow null and empty string
-  categoryId?: string | null; // Allow null
-  additionalRequirementIds?: string[];
-  customHeadCode?: string;
-  customBodyCode?: string;
-  status?: 'ACTIVE' | 'INACTIVE';
-}
+// Import Shared Types
+import { FormState, FormUpdateCallback } from '@/types/productForm';
 
-// Re-define StatusData locally as it was removed
-interface StatusData {
-  status: 'ACTIVE' | 'INACTIVE';
-}
+// Helper function to generate slug (can be imported or defined here)
+const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/ /g, '-')
+    .replace(/[^\w-]+/g, '');
+};
 
-// Define a shared type for the form update callback
-export type FormUpdateCallback = (updatedData: Partial<FormState>) => void;
+// Helper functions for number conversion
+const toNumberOrUndefined = (value: any): number | undefined => {
+  if (value === '' || value === null || value === undefined) return undefined;
+  const num = Number(value);
+  return isNaN(num) ? undefined : num;
+};
+const toNumberOrDefault = (value: any, defaultValue: number): number => {
+  if (value === '' || value === null || value === undefined) return defaultValue;
+  const num = Number(value);
+  return isNaN(num) ? defaultValue : num;
+};
+
+// Helper to safely get string or empty string
+const toStringOrEmpty = (value: any): string => {
+  return value === null || value === undefined ? '' : String(value);
+};
+
+// Helper to safely get number or empty string
+const toNumberOrEmpty = (value: any): number | '' => {
+  if (value === null || value === undefined) return '';
+  const num = Number(value);
+  return isNaN(num) ? '' : num; // Return '' if conversion fails or original was not a number
+};
+
+// Helper to safely get number or null or empty string
+const toNumberOrNullOrEmpty = (value: any): number | null | '' => {
+  if (value === null) return null;
+  if (value === undefined || value === '') return '';
+  const num = Number(value);
+  return isNaN(num) ? '' : num;
+};
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -116,11 +104,12 @@ export default function EditProductPage() {
       if (productResponse?.success && productResponse.data) {
         const actualProductData = productResponse.data;
         setProductId(actualProductData.id);
-
         // Ensure defaults for potentially null/undefined fields expected by UI components
         setFormState({
-          name: actualProductData.name ?? '',
+          productName: actualProductData.name ?? '',
           slug: actualProductData.slug ?? '',
+          originalSlug: actualProductData.slug ?? '',
+          productId: actualProductData.id,
           gameCode: actualProductData.gameCode ?? '',
           analyticsCode: actualProductData.analyticsCode ?? '',
           requirePhone: actualProductData.requirePhone ?? false,
@@ -131,32 +120,32 @@ export default function EditProductPage() {
           metaTitle: actualProductData.metaTitle ?? '',
           metaDescription: actualProductData.metaDescription ?? '',
           mainKeyword: actualProductData.mainKeyword ?? '',
-          secondaryKeywords: actualProductData.secondaryKeywords ?? [],
-          tags: actualProductData.tags ?? [],
+          secondaryKeywords: actualProductData.secondaryKeywords || [],
+          tags: actualProductData.tags || [],
           popupEnabled: actualProductData.popupEnabled ?? false,
           popupTitle: actualProductData.popupTitle ?? '',
           popupContent: actualProductData.popupContent ?? '',
           guideUrl: actualProductData.guideUrl ?? '',
           imageUrl: actualProductData.imageUrl ?? '',
-          originalPrice: actualProductData.originalPrice ?? '',
-          importPrice: actualProductData.importPrice ?? '',
+          originalPrice: toNumberOrEmpty(actualProductData.originalPrice),
+          importPrice: toNumberOrEmpty(actualProductData.importPrice),
           importSource: actualProductData.importSource ?? '',
-          quantity: actualProductData.quantity ?? '',
+          quantity: toNumberOrEmpty(actualProductData.quantity),
           autoSyncQuantityWithKey: actualProductData.autoSyncQuantityWithKey ?? false,
-          minPerOrder: actualProductData.minPerOrder ?? '',
-          maxPerOrder: actualProductData.maxPerOrder ?? '',
+          minPerOrder: toNumberOrEmpty(actualProductData.minPerOrder),
+          maxPerOrder: toNumberOrNullOrEmpty(actualProductData.maxPerOrder),
           autoDeliverKey: actualProductData.autoDeliverKey ?? false,
           showMoreDescription: actualProductData.showMoreDescription ?? false,
           promotionEnabled: actualProductData.promotionEnabled ?? false,
-          lowStockWarning: actualProductData.lowStockWarning ?? '',
+          lowStockWarning: toNumberOrNullOrEmpty(actualProductData.lowStockWarning),
           gameKeyText: actualProductData.gameKeyText ?? '',
           guideText: actualProductData.guideText ?? '',
-          expiryDays: actualProductData.expiryDays ?? '',
+          expiryDays: toNumberOrNullOrEmpty(actualProductData.expiryDays),
           allowComment: actualProductData.allowComment ?? false,
-          promotionPrice: actualProductData.promotionPrice ?? '',
+          promotionPrice: toNumberOrNullOrEmpty(actualProductData.promotionPrice),
           promotionStartDate: actualProductData.promotionStartDate,
           promotionEndDate: actualProductData.promotionEndDate,
-          promotionQuantity: actualProductData.promotionQuantity ?? '',
+          promotionQuantity: toNumberOrNullOrEmpty(actualProductData.promotionQuantity),
           categoryId: actualProductData.categoryId ?? null,
           additionalRequirementIds: actualProductData.additionalRequirementIds ?? [],
           customHeadCode: actualProductData.customHeadCode ?? '',
@@ -186,9 +175,18 @@ export default function EditProductPage() {
     loadInitialData();
   }, [loadInitialData]);
 
-  // Handle form updates from child components using a single handler
+  // Use the imported shared type
   const handleFormChange: FormUpdateCallback = useCallback((updatedData) => {
-    setFormState((prev) => ({ ...prev, ...updatedData }));
+    setFormState(prevState => {
+      const newState = { ...prevState, ...updatedData };
+      // Auto-update slug if productName changes and slug hasn't been manually edited
+      if ('productName' in updatedData && updatedData.productName &&
+          (!newState.originalSlug || newState.slug === newState.originalSlug || newState.slug === generateSlug(prevState.productName || '')))
+      {
+        newState.slug = generateSlug(updatedData.productName);
+      }
+      return newState;
+    });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -211,48 +209,48 @@ export default function EditProductPage() {
     };
 
     const updateData: Partial<Omit<Product, 'id' | 'slug' | 'createdAt' | 'updatedAt' | 'category'>> = {
-      name: formState.name || undefined,
-      gameCode: formState.gameCode || undefined,
-      analyticsCode: formState.analyticsCode || undefined,
-      requirePhone: formState.requirePhone ?? false,
-      shortDescription: formState.shortDescription || undefined,
-      description: formState.description || undefined,
-      warrantyPolicy: formState.warrantyPolicy || undefined,
-      faq: formState.faq || undefined,
-      metaTitle: formState.metaTitle || undefined,
-      metaDescription: formState.metaDescription || undefined,
-      mainKeyword: formState.mainKeyword || undefined,
-      secondaryKeywords: formState.secondaryKeywords?.length ? formState.secondaryKeywords : undefined,
-      tags: formState.tags?.length ? formState.tags : undefined,
-      popupEnabled: formState.popupEnabled ?? false,
-      popupTitle: formState.popupTitle || undefined,
-      popupContent: formState.popupContent || undefined,
-      guideUrl: formState.guideUrl || undefined,
-      imageUrl: formState.imageUrl || undefined,
-      originalPrice: Number(formState.originalPrice) || 0,
-      importPrice: Number(formState.importPrice) || 0,
-      importSource: formState.importSource || undefined,
-      quantity: Number(formState.quantity) || 0,
-      autoSyncQuantityWithKey: formState.autoSyncQuantityWithKey ?? false,
-      minPerOrder: Number(formState.minPerOrder) || 1,
-      maxPerOrder: formState.maxPerOrder === '' ? undefined : Number(formState.maxPerOrder) || undefined,
-      autoDeliverKey: formState.autoDeliverKey ?? false,
-      showMoreDescription: formState.showMoreDescription ?? false,
-      promotionEnabled: formState.promotionEnabled ?? false,
-      lowStockWarning: formState.lowStockWarning === '' ? undefined : Number(formState.lowStockWarning) || undefined,
-      gameKeyText: formState.gameKeyText || undefined,
-      guideText: formState.guideText || undefined,
-      expiryDays: formState.expiryDays === '' ? undefined : Number(formState.expiryDays) || undefined,
-      allowComment: formState.allowComment ?? false,
-      promotionPrice: formState.promotionPrice === '' ? undefined : Number(formState.promotionPrice) || undefined,
+      name: formState.productName,
+      gameCode: formState.gameCode,
+      analyticsCode: formState.analyticsCode,
+      requirePhone: formState.requirePhone,
+      shortDescription: formState.shortDescription,
+      description: formState.description,
+      warrantyPolicy: formState.warrantyPolicy,
+      faq: formState.faq,
+      metaTitle: formState.metaTitle,
+      metaDescription: formState.metaDescription,
+      mainKeyword: formState.mainKeyword,
+      secondaryKeywords: formState.secondaryKeywords,
+      tags: formState.tags,
+      popupEnabled: formState.popupEnabled,
+      popupTitle: formState.popupTitle,
+      popupContent: formState.popupContent,
+      guideUrl: formState.guideUrl,
+      imageUrl: formState.imageUrl,
+      originalPrice: toNumberOrUndefined(formState.originalPrice),
+      importPrice: toNumberOrUndefined(formState.importPrice),
+      importSource: formState.importSource,
+      quantity: toNumberOrUndefined(formState.quantity),
+      autoSyncQuantityWithKey: formState.autoSyncQuantityWithKey,
+      minPerOrder: toNumberOrUndefined(formState.minPerOrder),
+      maxPerOrder: toNumberOrUndefined(formState.maxPerOrder),
+      autoDeliverKey: formState.autoDeliverKey,
+      showMoreDescription: formState.showMoreDescription,
+      promotionEnabled: formState.promotionEnabled,
+      lowStockWarning: toNumberOrUndefined(formState.lowStockWarning),
+      gameKeyText: formState.gameKeyText,
+      guideText: formState.guideText,
+      expiryDays: toNumberOrUndefined(formState.expiryDays),
+      allowComment: formState.allowComment,
+      promotionPrice: toNumberOrUndefined(formState.promotionPrice),
       promotionStartDate: formatDateForApi(formState.promotionStartDate),
       promotionEndDate: formatDateForApi(formState.promotionEndDate),
-      promotionQuantity: formState.promotionQuantity === '' ? undefined : Number(formState.promotionQuantity) || undefined,
-      categoryId: formState.categoryId || null,
-      additionalRequirementIds: formState.additionalRequirementIds?.length ? formState.additionalRequirementIds : undefined,
-      customHeadCode: formState.customHeadCode || undefined,
-      customBodyCode: formState.customBodyCode || undefined,
-      status: formState.status ?? 'INACTIVE',
+      promotionQuantity: toNumberOrUndefined(formState.promotionQuantity),
+      categoryId: formState.categoryId,
+      additionalRequirementIds: formState.additionalRequirementIds,
+      customHeadCode: formState.customHeadCode,
+      customBodyCode: formState.customBodyCode,
+      status: formState.status,
     };
 
     Object.keys(updateData).forEach(key => {
@@ -267,6 +265,7 @@ export default function EditProductPage() {
       const updatedProduct = await productApi.update(productId, updateData);
       console.log('Product updated:', updatedProduct);
       toast.success("Sản phẩm đã được cập nhật thành công!");
+      setFormState(prev => ({...prev, originalSlug: prev.slug}));
     } catch (error) {
       console.error('Error updating product:', error);
       const errorMsg = (error as any)?.response?.data?.message || (error as Error)?.message || 'Lỗi không xác định';
@@ -295,87 +294,96 @@ export default function EditProductPage() {
   console.log("Rendering EditProductPage with formState:", formState);
 
   return (
-    <div className="container mx-auto py-6 px-4 md:px-6 lg:px-8 max-w-5xl">
+    <div className="p-6 space-y-6">
       <form onSubmit={handleSubmit}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <Link href="/admin/products">
+            <Link href="/products">
               <Button variant="outline" size="icon">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold">Chỉnh sửa sản phẩm: {formState.name || slug}</h1>
+            <h1 className="text-2xl font-bold">Chỉnh sửa sản phẩm: {formState.productName || slug}</h1>
           </div>
-          <Button type="submit" disabled={saving}>
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {saving ? "Đang lưu..." : "Lưu thay đổi"}
+          <Button type="submit" className="bg-purple-600 hover:bg-purple-700" disabled={saving || loading}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Save className="mr-2 h-4 w-4" />
+            Lưu Thay Đổi
           </Button>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-4 lg:grid-cols-7 mb-4">
-            <TabsTrigger value="overview">Tổng quan</TabsTrigger>
-            <TabsTrigger value="data">Dữ liệu</TabsTrigger>
-            <TabsTrigger value="linking">Liên kết</TabsTrigger>
-            <TabsTrigger value="promotion">Khuyến mãi</TabsTrigger>
-            <TabsTrigger value="popup">Popup</TabsTrigger>
-            <TabsTrigger value="status">Trạng thái</TabsTrigger>
-            <TabsTrigger value="customCode">Mã tùy chỉnh</TabsTrigger>
-          </TabsList>
+        <div className="space-y-4">
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 md:grid-cols-4 lg:grid-cols-7 mb-4">
+              <TabsTrigger value="overview">Tổng quan</TabsTrigger>
+              <TabsTrigger value="data">Dữ liệu</TabsTrigger>
+              <TabsTrigger value="linking">Liên kết</TabsTrigger>
+              <TabsTrigger value="promotion">Khuyến mãi</TabsTrigger>
+              <TabsTrigger value="popup">Popup</TabsTrigger>
+              <TabsTrigger value="status">Trạng thái</TabsTrigger>
+              <TabsTrigger value="customCode">Mã tùy chỉnh</TabsTrigger>
+            </TabsList>
 
-          <Card>
-            <TabsContent value="overview" className="p-6">
-              <OverviewSection 
-                key={productId || 'loading'}
-                formState={formState}
-                updateFormState={handleFormChange}
-              />
-            </TabsContent>
-            <TabsContent value="data" className="p-6">
-               <ProductDataSection 
-                 formState={formState}
-                 updateFormState={handleFormChange}
-               />
-            </TabsContent>
-             <TabsContent value="linking" className="p-6">
-               <LinkingSection 
-                 formState={formState}
-                 updateFormState={handleFormChange}
-                 categories={categories}
-               />
-             </TabsContent>
-            <TabsContent value="promotion" className="p-6">
-               <PromotionSection 
-                 key={`promo-${productId || 'loading'}`}
-                 formState={formState}
-                 updateFormState={handleFormChange}
-               />
-            </TabsContent>
-            <TabsContent value="popup" className="p-6">
-               <PopupNotificationSection 
-                 formState={formState}
-                 updateFormState={handleFormChange}
-               />
-            </TabsContent>
-            <TabsContent value="status" className="p-6">
-                 <StatusSection 
-                     formState={{ status: formState.status || 'ACTIVE' }}
-                     updateFormState={(data: StatusData) => handleFormChange({ status: data.status })}
+            <Card>
+              <TabsContent value="overview" className="p-6">
+                <OverviewSection 
+                  key={`overview-${productId}`}
+                  formState={formState}
+                  updateFormState={handleFormChange}
+                />
+              </TabsContent>
+              <TabsContent value="data" className="p-6">
+                 <ProductDataSection 
+                   key={`data-${productId}`}
+                   formState={formState}
+                   updateFormState={handleFormChange}
                  />
-             </TabsContent>
-            <TabsContent value="customCode" className="p-6">
-               <CustomCodeSection 
-                 formState={formState}
-                 updateFormState={handleFormChange}
-               />
-            </TabsContent>
-          </Card>
-        </Tabs>
+              </TabsContent>
+               <TabsContent value="linking" className="p-6">
+                 <LinkingSection 
+                   key={`linking-${productId}`}
+                   formState={formState}
+                   updateFormState={handleFormChange}
+                   categories={categories}
+                 />
+               </TabsContent>
+              <TabsContent value="promotion" className="p-6">
+                 <PromotionSection 
+                   key={`promo-${productId}`}
+                   formState={formState}
+                   updateFormState={handleFormChange}
+                 />
+              </TabsContent>
+              <TabsContent value="popup" className="p-6">
+                 <PopupNotificationSection 
+                   key={`popup-${productId}`}
+                   formState={formState}
+                   updateFormState={handleFormChange}
+                 />
+              </TabsContent>
+              <TabsContent value="status" className="p-6">
+                   <StatusSection 
+                       key={`status-${productId}`}
+                       formState={{ status: formState.status || 'ACTIVE' }}
+                       updateFormState={(data: { status: 'ACTIVE' | 'INACTIVE' }) => handleFormChange({ status: data.status })}
+                   />
+               </TabsContent>
+              <TabsContent value="customCode" className="p-6">
+                 <CustomCodeSection 
+                   key={`custom-${productId}`}
+                   formState={formState}
+                   updateFormState={handleFormChange}
+                 />
+              </TabsContent>
+            </Card>
+          </Tabs>
+        </div>
         
         <div className="mt-6 flex justify-end">
-           <Button type="submit" disabled={saving}>
-             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-             {saving ? "Đang lưu..." : "Lưu thay đổi"}
+           <Button type="submit" className="bg-purple-600 hover:bg-purple-700" disabled={saving || loading}>
+             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+             <Save className="mr-2 h-4 w-4" />
+             Lưu Thay Đổi
            </Button>
         </div>
       </form>

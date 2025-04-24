@@ -4,17 +4,9 @@ import React, { ChangeEvent } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import dynamic from 'next/dynamic';
-// Import types from parent
-import { FormState, FormUpdateCallback } from '@/app/(admin)/products/edit/[slug]/page';
-
-// Dynamic import for RichTextEditor
-const RichTextEditor = dynamic(
-  () => import('@/components/RichTextEditor/RichTextEditor').then(mod => mod.RichTextEditor),
-  { ssr: false, loading: () => <p>Loading Editor...</p> } 
-);
+import { FormState, FormUpdateCallback } from '@/types/productForm';
+import CKEditor4Field from '@/components/CKEditor4Field';
 
 interface PopupNotificationSectionProps {
   formState: FormState;
@@ -28,16 +20,16 @@ const PopupNotificationSection: React.FC<PopupNotificationSectionProps> = ({ for
         <div className="flex items-center space-x-2">
           <Switch
             id="popupEnabled"
-            checked={formState.popupEnabled || false}
-            onCheckedChange={(checked) => updateFormState({ popupEnabled: checked })}
+            checked={formState.popupEnabled ?? false}
+            onCheckedChange={(checked: boolean) => updateFormState({ popupEnabled: checked })}
           />
-          <Label htmlFor="popupEnabled">Bật Thông Báo Popup</Label>
+          <Label htmlFor="popupEnabled">Kích hoạt Popup Thông Báo</Label>
         </div>
 
         {formState.popupEnabled && (
-          <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-4 pl-6 border-l-2 border-gray-200 ml-2">
             <div>
-              <Label htmlFor="popupTitle">Tiêu Đề Popup</Label>
+              <Label htmlFor="popupTitle">Tiêu đề Popup</Label>
               <Input
                 id="popupTitle"
                 value={formState.popupTitle ?? ''}
@@ -45,12 +37,12 @@ const PopupNotificationSection: React.FC<PopupNotificationSectionProps> = ({ for
               />
             </div>
             <div>
-              <Label htmlFor="popupContent">Nội Dung Popup</Label>
-              <RichTextEditor
-                 initialContent={formState.popupContent ?? ''}
-                 onChange={(htmlContent) => {
-                    updateFormState({ popupContent: htmlContent });
-                  }}
+              <Label htmlFor="popupContent">Nội dung Popup</Label>
+              <CKEditor4Field
+                id="popupContent"
+                value={formState.popupContent}
+                onChange={(data) => updateFormState({ popupContent: data })}
+                config={{ height: 200 }}
               />
             </div>
           </div>
