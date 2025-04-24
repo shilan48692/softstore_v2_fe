@@ -10,6 +10,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { FormState, FormUpdateCallback } from '@/app/(admin)/products/edit/[slug]/page';
 
 // Dynamic import for RichTextEditor
 const RichTextEditor = dynamic(
@@ -17,29 +18,9 @@ const RichTextEditor = dynamic(
   { ssr: false, loading: () => <p>Loading Editor...</p> } 
 );
 
-interface FormState {
-  guideUrl: string;
-  imageUrl: string;
-  originalPrice: number;
-  importPrice: number;
-  importSource: string;
-  quantity: number;
-  autoSyncQuantity: boolean;
-  minQuantity: number;
-  maxQuantity: number;
-  autoDeliverKey: boolean;
-  showReadMore: boolean;
-  enablePromotion: boolean;
-  lowStockThreshold: number;
-  gameKeyDisplayText: string;
-  instructionalText: string;
-  expiryDays: number;
-  allowComments: boolean;
-}
-
 interface ProductDataSectionProps {
   formState: FormState;
-  updateFormState: (data: Partial<FormState>) => void;
+  updateFormState: FormUpdateCallback;
 }
 
 const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, updateFormState }) => {
@@ -48,22 +29,25 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
 
   // Put the functions back inside the component
   const handleNumberChange = (key: keyof FormState, value: string) => {
-      const num = value === '' ? 0 : parseInt(value, 10);
+      // Allow null for optional fields by checking the key
+      const optionalNumericFields: (keyof FormState)[] = ['maxPerOrder', 'lowStockWarning', 'expiryDays'];
+      const isOptional = optionalNumericFields.includes(key);
+      
+      if (value === '') {
+          updateFormState({ [key]: isOptional ? null : 0 } as Partial<FormState>);
+          return;
+      }
+      const num = parseInt(value, 10);
       if (!isNaN(num) && num >= 0) {
           updateFormState({ [key]: num } as Partial<FormState>);
+      } else if (value === '' && isOptional) {
+           updateFormState({ [key]: null } as Partial<FormState>);
       }
   };
 
   const handleMaxQuantityChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    if (rawValue === '') {
-        updateFormState({ maxQuantity: 0 });
-        return;
-    }
-    const value = parseInt(rawValue, 10);
-    if (!isNaN(value) && value >= 0) {
-        updateFormState({ maxQuantity: value });
-    }
+    // Use handleNumberChange for consistency
+    handleNumberChange('maxPerOrder', e.target.value);
   };
 
   // --- Image Upload Logic ---
@@ -96,13 +80,21 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
     formData.append('file', file);
 
     try {
+      // REMOVE localStorage token retrieval and header creation
+      /* 
       const token = localStorage.getItem('token'); 
       if (!token) {
         throw new Error('Authentication token not found.');
       }
       const headers: HeadersInit = { 'Authorization': `Bearer ${token}` };
+      */
 
-      const response = await fetch('/api/upload', { method: 'POST', headers: headers, body: formData });
+      // Make fetch request WITHOUT manual Authorization header
+      const response = await fetch('/api/upload', { 
+        method: 'POST', 
+        // headers: headers, // REMOVE headers option
+        body: formData 
+      });
 
       if (!response.ok) {
         let errorMsg = 'Upload failed';
@@ -197,7 +189,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
               <Input
                 id="originalPrice"
                 type="number"
-                value={formState.originalPrice}
+                value={formState.originalPrice ?? ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('originalPrice', e.target.value)}
                 required
               />
@@ -207,7 +199,7 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
               <Input
                 id="importPrice"
                 type="number"
-                value={formState.importPrice}
+                value={formState.importPrice ?? ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('importPrice', e.target.value)}
               />
             </div>
@@ -227,35 +219,37 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
               <Input
                 id="quantity"
                 type="number"
-                value={formState.quantity}
+                value={formState.quantity ?? ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('quantity', e.target.value)}
                 required
               />
             </div>
             <div className="flex items-center space-x-2">
               <Switch
-                id="autoSyncQuantity"
-                checked={formState.autoSyncQuantity}
-                onCheckedChange={(checked: boolean) => updateFormState({ autoSyncQuantity: checked })}
+                id="autoSyncQuantityWithKey"
+                checked={formState.autoSyncQuantityWithKey}
+                onCheckedChange={(checked: boolean) => updateFormState({ autoSyncQuantityWithKey: checked })}
               />
-              <Label htmlFor="autoSyncQuantity">Tự Động Đồng Bộ Số Lượng</Label>
+              <Label htmlFor="autoSyncQuantityWithKey">Tự Động Đồng Bộ Số Lượng Theo Key</Label>
             </div>
             <div>
-              <Label htmlFor="minQuantity">Số Lượng Tối Thiểu</Label>
+              <Label htmlFor="minPerOrder">Số Lượng Tối Thiểu / Đơn</Label>
               <Input
-                id="minQuantity"
+                id="minPerOrder"
                 type="number"
-                value={formState.minQuantity}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('minQuantity', e.target.value)}
+                value={formState.minPerOrder ?? ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('minPerOrder', e.target.value)}
+                min="1"
               />
             </div>
             <div>
-              <Label htmlFor="maxQuantity">Số Lượng Tối Đa</Label>
+              <Label htmlFor="maxPerOrder">Số Lượng Tối Đa</Label>
               <Input
-                id="maxQuantity"
+                id="maxPerOrder"
                 type="number"
-                value={formState.maxQuantity ? String(formState.maxQuantity) : '10'}
+                value={formState.maxPerOrder ?? ''}
                 onChange={handleMaxQuantityChange}
+                min="0"
               />
             </div>
           </div>
@@ -272,46 +266,39 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
           </div>
           <div className="flex items-center space-x-2">
             <Switch
-              id="showReadMore"
-              checked={formState.showReadMore}
-              onCheckedChange={(checked: boolean) => updateFormState({ showReadMore: checked })}
+              id="showMoreDescription"
+              checked={formState.showMoreDescription}
+              onCheckedChange={(checked: boolean) => updateFormState({ showMoreDescription: checked })}
             />
-            <Label htmlFor="showReadMore">Hiển Thị Xem Thêm</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="enablePromotion"
-              checked={formState.enablePromotion}
-              onCheckedChange={(checked: boolean) => updateFormState({ enablePromotion: checked })}
-            />
-            <Label htmlFor="enablePromotion">Bật Khuyến Mãi</Label>
+            <Label htmlFor="showMoreDescription">Hiển Thị Nút Đọc Thêm</Label>
           </div>
           <div>
-            <Label htmlFor="lowStockThreshold">Ngưỡng Hết Hàng</Label>
+            <Label htmlFor="lowStockWarning">Ngưỡng Hết Hàng</Label>
             <Input
-              id="lowStockThreshold"
+              id="lowStockWarning"
               type="number"
-              value={formState.lowStockThreshold}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('lowStockThreshold', e.target.value)}
+              value={formState.lowStockWarning ?? ''}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('lowStockWarning', e.target.value)}
+              min="0"
             />
           </div>
         </div>
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="gameKeyDisplayText">Văn Bản Hiển Thị Key Game</Label>
+            <Label htmlFor="gameKeyText">Văn Bản Hiển Thị Key Game</Label>
             <Input
-              id="gameKeyDisplayText"
-              value={formState.gameKeyDisplayText}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ gameKeyDisplayText: e.target.value })}
+              id="gameKeyText"
+              value={formState.gameKeyText}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ gameKeyText: e.target.value })}
             />
           </div>
           <div>
-            <Label htmlFor="instructionalText">Văn Bản Hướng Dẫn</Label>
+            <Label htmlFor="guideText">Văn Bản Hướng Dẫn</Label>
             <RichTextEditor
-              initialContent={formState.instructionalText}
+              initialContent={formState.guideText}
               onChange={(htmlContent) => {
-                updateFormState({ instructionalText: htmlContent });
+                updateFormState({ guideText: htmlContent });
               }}
             />
           </div>
@@ -320,17 +307,18 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
             <Input
               id="expiryDays"
               type="number"
-              value={formState.expiryDays}
+              value={formState.expiryDays ?? ''}
               onChange={(e: ChangeEvent<HTMLInputElement>) => handleNumberChange('expiryDays', e.target.value)}
+              min="0"
             />
           </div>
           <div className="flex items-center space-x-2">
             <Switch
-              id="allowComments"
-              checked={formState.allowComments}
-              onCheckedChange={(checked: boolean) => updateFormState({ allowComments: checked })}
+              id="allowComment"
+              checked={formState.allowComment}
+              onCheckedChange={(checked: boolean) => updateFormState({ allowComment: checked })}
             />
-            <Label htmlFor="allowComments">Cho Phép Bình Luận</Label>
+            <Label htmlFor="allowComment">Cho Phép Bình Luận</Label>
           </div>
         </div>
       </CardContent>

@@ -19,82 +19,60 @@ import PromotionSection from "@/app/(admin)/products/create/components/sections/
 import CustomCodeSection from "@/app/(admin)/products/create/components/sections/CustomCodeSection";
 import StatusSection from "@/app/(admin)/products/create/components/sections/StatusSection";
 
-interface OverviewData {
-  // Overview section
-  gameCode: string;
-  analyticsCode: string;
-  productName: string;
-  requirePhoneNumber: boolean;
-  shortSummary: string;
-  fullDescription: string;
-  warrantyPolicy: string;
-  faq: string;
-  metaTitle: string;
-  metaDescription: string;
-  mainKeyword: string;
-  secondaryKeywords: string[];
-  tags: string[];
+// Define the canonical FormState based on API Product type + form needs
+export interface FormState {
+  name?: string;
+  slug?: string;
+  gameCode?: string;
+  analyticsCode?: string;
+  requirePhone?: boolean;
+  shortDescription?: string;
+  description?: string; // For Rich Text Editor
+  warrantyPolicy?: string; // For Rich Text Editor
+  faq?: string; // For Rich Text Editor
+  metaTitle?: string;
+  metaDescription?: string;
+  mainKeyword?: string;
+  secondaryKeywords?: string[];
+  tags?: string[];
+  popupEnabled?: boolean;
+  popupTitle?: string;
+  popupContent?: string;
+  guideUrl?: string;
+  imageUrl?: string;
+  originalPrice?: number | ''; // Allow empty string for input
+  importPrice?: number | '';   // Allow empty string for input
+  importSource?: string;
+  quantity?: number | '';     // Allow empty string for input
+  autoSyncQuantityWithKey?: boolean;
+  minPerOrder?: number | '';    // Allow empty string for input
+  maxPerOrder?: number | null | ''; // Allow null and empty string
+  autoDeliverKey?: boolean;
+  showMoreDescription?: boolean;
+  promotionEnabled?: boolean;
+  lowStockWarning?: number | null | ''; // Allow null and empty string
+  gameKeyText?: string;
+  guideText?: string; // For Rich Text Editor
+  expiryDays?: number | null | ''; // Allow null and empty string
+  allowComment?: boolean;
+  promotionPrice?: number | null | ''; // Allow null and empty string
+  promotionStartDate?: string | null; // Date string or null
+  promotionEndDate?: string | null;   // Date string or null
+  promotionQuantity?: number | null | ''; // Allow null and empty string
+  categoryId?: string | null; // Allow null
+  additionalRequirementIds?: string[];
+  customHeadCode?: string;
+  customBodyCode?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
 }
 
-interface PopupNotificationData {
-  // Popup notification section
-  enablePopup: boolean;
-  popupTitle: string;
-  popupContent: string;
-}
-
-interface ProductDataSectionData {
-  // Product data section
-  guideUrl: string;
-  imageUrl: string;
-  originalPrice: number;
-  importPrice: number;
-  importSource: string;
-  quantity: number;
-  autoSyncQuantity: boolean;
-  minQuantity: number;
-  maxQuantity: number;
-  autoDeliverKey: boolean;
-  showReadMore: boolean;
-  enablePromotion: boolean;
-  lowStockThreshold: number;
-  gameKeyDisplayText: string;
-  instructionalText: string;
-  expiryDays: number;
-  allowComments: boolean;
-}
-
-interface LinkingSectionData {
-  // Linking section
-  productCategory: string;
-  relatedProducts: string[];
-  additionalRequirements: string[];
-}
-
-interface PromotionSectionData {
-  // Promotion section
-  promotionPrice: number;
-  promotionStartDate: string | null;
-  promotionEndDate: string | null;
-  promotionQuantity: number;
-}
-
-interface CustomCodeSectionData {
-  // Custom code section
-  customHtmlHead: string;
-  customHtmlBody: string;
-}
-
+// Re-define StatusData locally as it was removed
 interface StatusData {
   status: 'ACTIVE' | 'INACTIVE';
 }
 
-interface FormState extends Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'category'>> {
-  // Add fields that might not directly map or need special handling if any
-}
-
 // Define a shared type for the form update callback
-type FormUpdateCallback = (updatedData: Partial<FormState>) => void;
+export type FormUpdateCallback = (updatedData: Partial<FormState>) => void;
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -139,50 +117,51 @@ export default function EditProductPage() {
         const actualProductData = productResponse.data;
         setProductId(actualProductData.id);
 
+        // Ensure defaults for potentially null/undefined fields expected by UI components
         setFormState({
-          name: actualProductData.name,
-          slug: actualProductData.slug,
-          gameCode: actualProductData.gameCode,
-          analyticsCode: actualProductData.analyticsCode,
-          requirePhone: actualProductData.requirePhone,
-          shortDescription: actualProductData.shortDescription,
-          description: actualProductData.description,
-          warrantyPolicy: actualProductData.warrantyPolicy,
-          faq: actualProductData.faq,
-          metaTitle: actualProductData.metaTitle,
-          metaDescription: actualProductData.metaDescription,
-          mainKeyword: actualProductData.mainKeyword,
-          secondaryKeywords: actualProductData.secondaryKeywords,
-          tags: actualProductData.tags,
-          popupEnabled: actualProductData.popupEnabled,
-          popupTitle: actualProductData.popupTitle,
-          popupContent: actualProductData.popupContent,
-          guideUrl: actualProductData.guideUrl,
-          imageUrl: actualProductData.imageUrl,
-          originalPrice: actualProductData.originalPrice,
-          importPrice: actualProductData.importPrice,
-          importSource: actualProductData.importSource,
-          quantity: actualProductData.quantity,
-          autoSyncQuantityWithKey: actualProductData.autoSyncQuantityWithKey,
-          minPerOrder: actualProductData.minPerOrder,
-          maxPerOrder: actualProductData.maxPerOrder,
-          autoDeliverKey: actualProductData.autoDeliverKey,
-          showMoreDescription: actualProductData.showMoreDescription,
-          promotionEnabled: actualProductData.promotionEnabled,
-          lowStockWarning: actualProductData.lowStockWarning,
-          gameKeyText: actualProductData.gameKeyText,
-          guideText: actualProductData.guideText,
-          expiryDays: actualProductData.expiryDays,
-          allowComment: actualProductData.allowComment,
-          promotionPrice: actualProductData.promotionPrice,
+          name: actualProductData.name ?? '',
+          slug: actualProductData.slug ?? '',
+          gameCode: actualProductData.gameCode ?? '',
+          analyticsCode: actualProductData.analyticsCode ?? '',
+          requirePhone: actualProductData.requirePhone ?? false,
+          shortDescription: actualProductData.shortDescription ?? '',
+          description: actualProductData.description ?? '',
+          warrantyPolicy: actualProductData.warrantyPolicy ?? '',
+          faq: actualProductData.faq ?? '',
+          metaTitle: actualProductData.metaTitle ?? '',
+          metaDescription: actualProductData.metaDescription ?? '',
+          mainKeyword: actualProductData.mainKeyword ?? '',
+          secondaryKeywords: actualProductData.secondaryKeywords ?? [],
+          tags: actualProductData.tags ?? [],
+          popupEnabled: actualProductData.popupEnabled ?? false,
+          popupTitle: actualProductData.popupTitle ?? '',
+          popupContent: actualProductData.popupContent ?? '',
+          guideUrl: actualProductData.guideUrl ?? '',
+          imageUrl: actualProductData.imageUrl ?? '',
+          originalPrice: actualProductData.originalPrice ?? '',
+          importPrice: actualProductData.importPrice ?? '',
+          importSource: actualProductData.importSource ?? '',
+          quantity: actualProductData.quantity ?? '',
+          autoSyncQuantityWithKey: actualProductData.autoSyncQuantityWithKey ?? false,
+          minPerOrder: actualProductData.minPerOrder ?? '',
+          maxPerOrder: actualProductData.maxPerOrder ?? '',
+          autoDeliverKey: actualProductData.autoDeliverKey ?? false,
+          showMoreDescription: actualProductData.showMoreDescription ?? false,
+          promotionEnabled: actualProductData.promotionEnabled ?? false,
+          lowStockWarning: actualProductData.lowStockWarning ?? '',
+          gameKeyText: actualProductData.gameKeyText ?? '',
+          guideText: actualProductData.guideText ?? '',
+          expiryDays: actualProductData.expiryDays ?? '',
+          allowComment: actualProductData.allowComment ?? false,
+          promotionPrice: actualProductData.promotionPrice ?? '',
           promotionStartDate: actualProductData.promotionStartDate,
           promotionEndDate: actualProductData.promotionEndDate,
-          promotionQuantity: actualProductData.promotionQuantity,
-          categoryId: actualProductData.categoryId,
-          additionalRequirementIds: actualProductData.additionalRequirementIds,
-          customHeadCode: actualProductData.customHeadCode,
-          customBodyCode: actualProductData.customBodyCode,
-          status: actualProductData.status,
+          promotionQuantity: actualProductData.promotionQuantity ?? '',
+          categoryId: actualProductData.categoryId ?? null,
+          additionalRequirementIds: actualProductData.additionalRequirementIds ?? [],
+          customHeadCode: actualProductData.customHeadCode ?? '',
+          customBodyCode: actualProductData.customBodyCode ?? '',
+          status: actualProductData.status ?? 'INACTIVE',
         });
       } else {
         const prodError = productResponse?.message || 'Lỗi không rõ khi tải sản phẩm.';
@@ -208,7 +187,7 @@ export default function EditProductPage() {
   }, [loadInitialData]);
 
   // Handle form updates from child components using a single handler
-  const handleFormChange = useCallback((updatedData: Partial<FormState>) => {
+  const handleFormChange: FormUpdateCallback = useCallback((updatedData) => {
     setFormState((prev) => ({ ...prev, ...updatedData }));
   }, []);
 
@@ -232,48 +211,48 @@ export default function EditProductPage() {
     };
 
     const updateData: Partial<Omit<Product, 'id' | 'slug' | 'createdAt' | 'updatedAt' | 'category'>> = {
-      name: formState.name,
-      gameCode: formState.gameCode,
-      analyticsCode: formState.analyticsCode,
-      requirePhone: formState.requirePhone,
-      shortDescription: formState.shortDescription,
-      description: formState.description,
-      warrantyPolicy: formState.warrantyPolicy,
-      faq: formState.faq,
-      metaTitle: formState.metaTitle,
-      metaDescription: formState.metaDescription,
-      mainKeyword: formState.mainKeyword,
-      secondaryKeywords: formState.secondaryKeywords,
-      tags: formState.tags,
-      popupEnabled: formState.popupEnabled,
-      popupTitle: formState.popupTitle,
-      popupContent: formState.popupContent,
-      guideUrl: formState.guideUrl,
-      imageUrl: formState.imageUrl,
+      name: formState.name || undefined,
+      gameCode: formState.gameCode || undefined,
+      analyticsCode: formState.analyticsCode || undefined,
+      requirePhone: formState.requirePhone ?? false,
+      shortDescription: formState.shortDescription || undefined,
+      description: formState.description || undefined,
+      warrantyPolicy: formState.warrantyPolicy || undefined,
+      faq: formState.faq || undefined,
+      metaTitle: formState.metaTitle || undefined,
+      metaDescription: formState.metaDescription || undefined,
+      mainKeyword: formState.mainKeyword || undefined,
+      secondaryKeywords: formState.secondaryKeywords?.length ? formState.secondaryKeywords : undefined,
+      tags: formState.tags?.length ? formState.tags : undefined,
+      popupEnabled: formState.popupEnabled ?? false,
+      popupTitle: formState.popupTitle || undefined,
+      popupContent: formState.popupContent || undefined,
+      guideUrl: formState.guideUrl || undefined,
+      imageUrl: formState.imageUrl || undefined,
       originalPrice: Number(formState.originalPrice) || 0,
       importPrice: Number(formState.importPrice) || 0,
-      importSource: formState.importSource,
+      importSource: formState.importSource || undefined,
       quantity: Number(formState.quantity) || 0,
-      autoSyncQuantityWithKey: formState.autoSyncQuantityWithKey,
+      autoSyncQuantityWithKey: formState.autoSyncQuantityWithKey ?? false,
       minPerOrder: Number(formState.minPerOrder) || 1,
-      maxPerOrder: formState.maxPerOrder === null ? null : (Number(formState.maxPerOrder) || null),
-      autoDeliverKey: formState.autoDeliverKey,
-      showMoreDescription: formState.showMoreDescription,
-      promotionEnabled: formState.promotionEnabled,
-      lowStockWarning: Number(formState.lowStockWarning) || 0,
-      gameKeyText: formState.gameKeyText,
-      guideText: formState.guideText,
-      expiryDays: Number(formState.expiryDays) || 0,
-      allowComment: formState.allowComment,
-      promotionPrice: formState.promotionPrice === null ? null : (Number(formState.promotionPrice) || null),
+      maxPerOrder: formState.maxPerOrder === '' ? undefined : Number(formState.maxPerOrder) || undefined,
+      autoDeliverKey: formState.autoDeliverKey ?? false,
+      showMoreDescription: formState.showMoreDescription ?? false,
+      promotionEnabled: formState.promotionEnabled ?? false,
+      lowStockWarning: formState.lowStockWarning === '' ? undefined : Number(formState.lowStockWarning) || undefined,
+      gameKeyText: formState.gameKeyText || undefined,
+      guideText: formState.guideText || undefined,
+      expiryDays: formState.expiryDays === '' ? undefined : Number(formState.expiryDays) || undefined,
+      allowComment: formState.allowComment ?? false,
+      promotionPrice: formState.promotionPrice === '' ? undefined : Number(formState.promotionPrice) || undefined,
       promotionStartDate: formatDateForApi(formState.promotionStartDate),
       promotionEndDate: formatDateForApi(formState.promotionEndDate),
-      promotionQuantity: formState.promotionQuantity === null ? null : (Number(formState.promotionQuantity) || null),
+      promotionQuantity: formState.promotionQuantity === '' ? undefined : Number(formState.promotionQuantity) || undefined,
       categoryId: formState.categoryId || null,
-      additionalRequirementIds: formState.additionalRequirementIds,
-      customHeadCode: formState.customHeadCode,
-      customBodyCode: formState.customBodyCode,
-      status: formState.status,
+      additionalRequirementIds: formState.additionalRequirementIds?.length ? formState.additionalRequirementIds : undefined,
+      customHeadCode: formState.customHeadCode || undefined,
+      customBodyCode: formState.customBodyCode || undefined,
+      status: formState.status ?? 'INACTIVE',
     };
 
     Object.keys(updateData).forEach(key => {
@@ -312,6 +291,9 @@ export default function EditProductPage() {
     );
   }
 
+  // Log the state just before rendering
+  console.log("Rendering EditProductPage with formState:", formState);
+
   return (
     <div className="container mx-auto py-6 px-4 md:px-6 lg:px-8 max-w-5xl">
       <form onSubmit={handleSubmit}>
@@ -344,32 +326,34 @@ export default function EditProductPage() {
           <Card>
             <TabsContent value="overview" className="p-6">
               <OverviewSection 
-                formState={formState as any}
+                key={productId || 'loading'}
+                formState={formState}
                 updateFormState={handleFormChange}
               />
             </TabsContent>
             <TabsContent value="data" className="p-6">
                <ProductDataSection 
-                 formState={formState as any}
+                 formState={formState}
                  updateFormState={handleFormChange}
                />
             </TabsContent>
              <TabsContent value="linking" className="p-6">
                <LinkingSection 
-                 formState={formState as any}
+                 formState={formState}
                  updateFormState={handleFormChange}
                  categories={categories}
                />
              </TabsContent>
             <TabsContent value="promotion" className="p-6">
                <PromotionSection 
-                 formState={formState as any}
+                 key={`promo-${productId || 'loading'}`}
+                 formState={formState}
                  updateFormState={handleFormChange}
                />
             </TabsContent>
             <TabsContent value="popup" className="p-6">
                <PopupNotificationSection 
-                 formState={formState as any}
+                 formState={formState}
                  updateFormState={handleFormChange}
                />
             </TabsContent>
@@ -381,7 +365,7 @@ export default function EditProductPage() {
              </TabsContent>
             <TabsContent value="customCode" className="p-6">
                <CustomCodeSection 
-                 formState={formState as any}
+                 formState={formState}
                  updateFormState={handleFormChange}
                />
             </TabsContent>

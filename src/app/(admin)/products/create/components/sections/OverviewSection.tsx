@@ -1,6 +1,6 @@
 'use client';
 
-import React, { ChangeEvent, useState, useEffect } from 'react';
+import React, { ChangeEvent, useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 // import { RichTextEditor } from '@/components/RichTextEditor/RichTextEditor'; // Comment out static import
 import dynamic from 'next/dynamic';
+// Import the types from the parent
+import { FormState, FormUpdateCallback } from '@/app/(admin)/products/edit/[slug]/page'; // Adjust path if needed
 
 // Dynamic import for RichTextEditor
 const RichTextEditor = dynamic(
@@ -37,37 +39,31 @@ const generateSlug = (str: string): string => {
   return str;
 };
 
-interface FormState {
-  gameCode: string;
-  analyticsCode: string;
-  productName: string;
-  requirePhoneNumber: boolean;
-  shortSummary: string;
-  fullDescription: string;
-  warrantyPolicy: string;
-  faq: string;
-  metaTitle: string;
-  metaDescription: string;
-  mainKeyword: string;
-  secondaryKeywords: string[];
-  tags: string[];
-  slug: string;
-  status: 'ACTIVE' | 'INACTIVE';
-}
-
 interface OverviewSectionProps {
   formState: FormState;
-  updateFormState: (data: Partial<FormState>) => void;
+  updateFormState: FormUpdateCallback;
 }
+
+// Assuming RichTextEditor has an imperative API like Tiptap
+// interface RichTextEditorRef { ... } // Remove for now
 
 const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateFormState }) => {
   console.log("OverviewSection received formState:", formState);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+  // Refs for Rich Text Editors - REMOVED FOR NOW
+  // const descriptionEditorRef = useRef<RichTextEditorRef>(null);
+  // const warrantyEditorRef = useRef<RichTextEditorRef>(null);
+  // const faqEditorRef = useRef<RichTextEditorRef>(null);
+
+  // Effect to update RTE content when formState changes - REMOVED FOR NOW
+  // useEffect(() => { ... }, [formState.description]);
+  // useEffect(() => { ... }, [formState.warrantyPolicy]);
+  // useEffect(() => { ... }, [formState.faq]);
 
   // Auto-generate slug when productName changes, if not manually edited
   useEffect(() => {
-    if (!isSlugManuallyEdited && formState.productName) {
-      const newSlug = generateSlug(formState.productName);
+    if (!isSlugManuallyEdited && formState.name) {
+      const newSlug = generateSlug(formState.name);
       // Chỉ cập nhật nếu slug thực sự thay đổi để tránh vòng lặp vô hạn
       if (newSlug !== formState.slug) {
         updateFormState({ slug: newSlug });
@@ -75,7 +71,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
     }
     // Dependency array chỉ cần productName để theo dõi thay đổi tên
     // Không cần isSlugManuallyEdited ở đây để tránh trigger khi nó thay đổi
-  }, [formState.productName, updateFormState, formState.slug, isSlugManuallyEdited]); // Thêm isSlugManuallyEdited để lint hài lòng, nhưng logic chính dựa vào check !isSlugManuallyEdited bên trong
+  }, [formState.name, updateFormState, formState.slug, isSlugManuallyEdited]); // Thêm isSlugManuallyEdited để lint hài lòng, nhưng logic chính dựa vào check !isSlugManuallyEdited bên trong
 
   const handleSlugChange = (e: ChangeEvent<HTMLInputElement>) => {
     setIsSlugManuallyEdited(true); // Đánh dấu slug đã được sửa thủ công
@@ -84,8 +80,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
   
   const handleProductNameChange = (e: ChangeEvent<HTMLInputElement>) => {
       const newName = e.target.value;
-      updateFormState({ productName: newName });
-      // Reset cờ sửa slug thủ công nếu tên sản phẩm trống
+      updateFormState({ name: newName }); // Corrected key to name
       if (newName === '') {
           setIsSlugManuallyEdited(false);
           updateFormState({ slug: '' }); 
@@ -117,7 +112,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
               <Label htmlFor="productName">Tên Sản Phẩm <span className="text-red-500">*</span></Label>
               <Input
                 id="productName"
-                value={formState.productName}
+                value={formState.name ?? ''}
                 onChange={handleProductNameChange}
                 required
               />
@@ -131,26 +126,11 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
                 placeholder="Tự động tạo hoặc nhập thủ công"
               />
             </div>
-            <div>
-              <Label htmlFor="status">Trạng Thái</Label>
-              <Select
-                value={formState.status}
-                onValueChange={(value: 'ACTIVE' | 'INACTIVE') => updateFormState({ status: value })}
-              >
-                <SelectTrigger id="status">
-                  <SelectValue placeholder="Chọn trạng thái" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ACTIVE">Đang hoạt động (ACTIVE)</SelectItem>
-                  <SelectItem value="INACTIVE">Ngừng hoạt động (INACTIVE)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <div className="flex items-center space-x-2 pt-2">
               <Switch
                 id="requirePhoneNumber"
-                checked={formState.requirePhoneNumber}
-                onCheckedChange={(checked) => updateFormState({ requirePhoneNumber: checked })}
+                checked={formState.requirePhone ?? false}
+                onCheckedChange={(checked) => updateFormState({ requirePhone: checked })}
               />
               <Label htmlFor="requirePhoneNumber">Yêu Cầu Số Điện Thoại</Label>
             </div>
@@ -161,16 +141,17 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
               <Label htmlFor="shortSummary">Tóm Tắt Ngắn</Label>
               <Textarea
                 id="shortSummary"
-                value={formState.shortSummary}
-                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateFormState({ shortSummary: e.target.value })}
+                value={formState.shortDescription ?? ''}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateFormState({ shortDescription: e.target.value })}
               />
             </div>
             <div>
               <Label htmlFor="fullDescription">Mô Tả Đầy Đủ</Label>
               <RichTextEditor
-                initialContent={formState.fullDescription}
+                // ref={descriptionEditorRef} // Remove ref
+                initialContent={formState.description ?? ''}
                 onChange={(htmlContent) => {
-                  updateFormState({ fullDescription: htmlContent });
+                  updateFormState({ description: htmlContent });
                 }}
               />
             </div>
@@ -181,7 +162,8 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
           <div>
             <Label htmlFor="warrantyPolicy">Chính Sách Bảo Hành</Label>
             <RichTextEditor
-              initialContent={formState.warrantyPolicy}
+              // ref={warrantyEditorRef} // Remove ref
+              initialContent={formState.warrantyPolicy ?? ''}
               onChange={(htmlContent) => {
                 updateFormState({ warrantyPolicy: htmlContent });
               }}
@@ -190,7 +172,8 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
           <div>
             <Label htmlFor="faq">Câu Hỏi Thường Gặp</Label>
             <RichTextEditor
-              initialContent={formState.faq}
+              // ref={faqEditorRef} // Remove ref
+              initialContent={formState.faq ?? ''}
               onChange={(htmlContent) => {
                 updateFormState({ faq: htmlContent });
               }}
@@ -227,7 +210,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
             <Label htmlFor="secondaryKeywords">Từ Khóa Phụ</Label>
             <Input
               id="secondaryKeywords"
-              value={formState.secondaryKeywords.join(', ')}
+              value={formState.secondaryKeywords?.join(', ') ?? ''}
               onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ secondaryKeywords: e.target.value.split(',').map(k => k.trim()) })}
               placeholder="Nhập từ khóa, phân cách bằng dấu phẩy"
             />
@@ -236,7 +219,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ formState, updateForm
             <Label htmlFor="tags">Thẻ</Label>
             <Input
               id="tags"
-              value={formState.tags.join(', ')}
+              value={formState.tags?.join(', ') ?? ''}
               onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ tags: e.target.value.split(',').map(t => t.trim()) })}
               placeholder="Nhập thẻ, phân cách bằng dấu phẩy"
             />

@@ -151,7 +151,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               {/* Ensure the edit link is correct, adjust if needed */}
-              <Link href={`/admin/products/edit/${product.slug}`} passHref legacyBehavior>
+              <Link href={`/products/edit/${product.slug}`} passHref legacyBehavior>
                  <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-indigo-600">
                    <span className="sr-only">Chỉnh sửa</span>
                    <Edit className="h-4 w-4" />

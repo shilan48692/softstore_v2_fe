@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,26 +14,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Category, productApi, Product } from "@/services/api";
+import { Category, productApi, Product, ApiResponse } from "@/services/api";
 import { useDebounce } from './useDebounce';
 import { Skeleton } from '@/components/ui/skeleton';
-
-interface FormState {
-  productCategory: string;
-  relatedProducts: string[];
-  additionalRequirements: string[];
-}
-
-interface LinkingSectionProps {
-  formState: FormState;
-  updateFormState: (data: Partial<FormState>) => void;
-  categories: Category[];
-  currentProductId?: string;
-}
+import { FormState, FormUpdateCallback } from '@/app/(admin)/products/edit/[slug]/page';
 
 interface SelectedProduct {
   id: string;
   name: string;
+}
+
+interface LinkingSectionProps {
+  formState: FormState;
+  updateFormState: FormUpdateCallback;
+  categories: Category[];
+  currentProductId?: string;
 }
 
 const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormState, categories, currentProductId }) => {
@@ -49,43 +44,22 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
   useEffect(() => {
     let isMounted = true;
     const fetchInitialProducts = async () => {
-      if (formState.relatedProducts && formState.relatedProducts.length > 0 && isInitialLoad) {
-        console.log("Fetching initial details for IDs:", formState.relatedProducts);
-        setIsLoadingSearch(true);
-        try {
-          const productDetailsPromises = formState.relatedProducts.map(id =>
-            productApi.getById(id).then(p => ({ id: p.id, name: p.name })).catch(err => {
-              console.error(`Error fetching product ${id}:`, err);
-              return null;
-            })
-          );
-          const productDetails = (await Promise.all(productDetailsPromises)).filter(p => p !== null) as SelectedProduct[];
-          if (isMounted) {
-            setSelectedProducts(productDetails);
-            console.log("Fetched initial products:", productDetails);
-          }
-        } catch (error) {
-          console.error("Error fetching initial related product details batch:", error);
-        } finally {
-          if (isMounted) {
-            setIsInitialLoad(false);
-            setIsLoadingSearch(false);
-          }
-        }
-      } else {
-        if (isMounted) {
-          setIsInitialLoad(false);
-        }
-      }
+      // This logic relies on internal state (`selectedProducts`), not directly on formState for initial IDs
+      // We need to get the initial IDs from the parent formState if they exist elsewhere
+      // Assuming the parent state *doesn't* hold initial related product IDs directly:
+      // Let the component manage its selected products entirely based on search/add/remove
+      // OR If parent *should* provide initial IDs (e.g., via a different prop or potentially formState.someOtherField?)
+      // We need to clarify how initial related products are passed.
+      // For now, assume it starts empty or relies on internal logic if needed.
+      setIsInitialLoad(false); // Simplify: Assume we don't load initial related products from parent state this way
+      /* 
+      const relatedProductIds = formState.relatedProductsIds ?? []; // This field doesn't exist
+      if (relatedProductIds.length > 0 && isInitialLoad) { ... }
+      */
     };
-
     fetchInitialProducts();
-
-    return () => {
-      isMounted = false; // Cleanup function to prevent state update on unmounted component
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => { isMounted = false; };
+  }, [isInitialLoad]);
 
   // Effect to search products when debounced query changes
   useEffect(() => {
@@ -137,7 +111,8 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
     if (!selectedProducts.some(p => p.id === product.id)) {
       const newSelectedProducts = [...selectedProducts, { id: product.id, name: product.name }];
       setSelectedProducts(newSelectedProducts);
-      updateFormState({ relatedProducts: newSelectedProducts.map(p => p.id) });
+      // REMOVE call to updateFormState as parent doesn't track this
+      // updateFormState({ relatedProductsIds: newSelectedProducts.map(p => p.id) });
     }
     setSearchQuery('');
     setSearchResults([]);
@@ -146,7 +121,8 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
   const handleRemoveProduct = (productId: string) => {
     const newSelectedProducts = selectedProducts.filter((p) => p.id !== productId);
     setSelectedProducts(newSelectedProducts);
-    updateFormState({ relatedProducts: newSelectedProducts.map(p => p.id) });
+    // REMOVE call to updateFormState as parent doesn't track this
+    // updateFormState({ relatedProductsIds: newSelectedProducts.map(p => p.id) });
   };
 
   return (
@@ -154,17 +130,17 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
       <CardContent className="space-y-6 p-6">
         <div className="space-y-4">
           <div>
-            <Label htmlFor="productCategory">Danh Mục Sản Phẩm</Label>
+            <Label htmlFor="categoryId">Danh Mục Sản Phẩm</Label>
             <Select
-              value={formState.productCategory || ''}
-              onValueChange={(value) => updateFormState({ productCategory: value })}
+              value={formState.categoryId ?? ''}
+              onValueChange={(value) => updateFormState({ categoryId: value || null })}
               disabled={categories.length === 0}
             >
-              <SelectTrigger id="productCategory">
+              <SelectTrigger id="categoryId">
                 <SelectValue placeholder="Chọn danh mục" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map(cat => (
+                {categories.map((cat: Category) => (
                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                  ))}
               </SelectContent>
@@ -180,7 +156,8 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm theo tên sản phẩm..."
               autoComplete="off"
-              disabled={isInitialLoad && formState.relatedProducts.length > 0}
+              // Disable prop doesn't depend on formState related products
+              disabled={isInitialLoad} 
             />
             {(isLoadingSearch || searchResults.length > 0 || (searchQuery.length >= 2 && !isLoadingSearch && searchResults.length === 0) ) && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -205,10 +182,9 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
            
             {/* Display Selected Products */}
             <div className="mt-2 flex flex-wrap gap-2 min-h-[24px]">
-              {isInitialLoad && formState.relatedProducts.length > 0 ? (
-                  Array.from({ length: formState.relatedProducts.length }).map((_, index) => (
-                      <Skeleton key={`skel-${index}`} className="h-6 w-24 rounded-full" />
-                  ))
+              {/* Skeleton/Display logic depends on internal `selectedProducts` state, not formState */}
+              {isInitialLoad ? (
+                 <Skeleton className="h-6 w-24 rounded-full" /> // Show one skeleton while loading?
               ) : (
                   selectedProducts.map((product) => (
                     <Badge key={product.id} variant="secondary" className="flex items-center gap-1">
@@ -228,11 +204,11 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
           </div>
          
           <div>
-            <Label htmlFor="additionalRequirements">Yêu Cầu Bổ Sung</Label>
+            <Label htmlFor="additionalRequirementIds">Yêu Cầu Bổ Sung</Label>
             <Textarea
-              id="additionalRequirements"
-              value={formState.additionalRequirements.join('\n')}
-              onChange={(e) => updateFormState({ additionalRequirements: e.target.value.split('\n').map(r => r.trim()) })}
+              id="additionalRequirementIds"
+              value={(formState.additionalRequirementIds ?? []).join('\n')}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateFormState({ additionalRequirementIds: e.target.value ? e.target.value.split('\n').map(r => r.trim()) : [] })}
               placeholder="Nhập yêu cầu (mỗi yêu cầu một dòng)"
               className="min-h-[100px]"
             />

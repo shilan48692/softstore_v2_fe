@@ -39,13 +39,14 @@ export default function LoginPage() {
 
         const data = await res.json();
         
-        // Kiểm tra xem có thông tin admin trả về không (token giờ được set qua cookie)
-        if (!data.admin) {
+        // Correctly check for the nested admin object
+        if (!data?.data?.admin) {
+          console.error("Invalid response structure:", data); // Log the actual structure for debugging
           throw new Error('Invalid response format from backend (missing admin info)');
         }
 
-        // Lưu thông tin admin vào localStorage (vẫn cần thiết nếu muốn hiển thị thông tin user trên UI)
-        localStorage.setItem('admin', JSON.stringify(data.admin));
+        // Correctly access the nested admin object for localStorage
+        localStorage.setItem('admin', JSON.stringify(data.data.admin)); // Changed from data.admin to data.data.admin
         
         toast.success('Đăng nhập thành công!');
         router.push('/');

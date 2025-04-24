@@ -292,7 +292,7 @@ export default function ProductsPage() {
                  <span className="sr-only">Làm mới</span>
                </Button>
               <Button asChild>
-                <Link href="/admin/products/create">
+                <Link href="/products/create">
                   <Plus className="mr-2 h-4 w-4" /> Thêm Sản phẩm
                 </Link>
               </Button>
