@@ -22,7 +22,10 @@ import Image from 'next/image';
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 import { Skeleton } from "@/components/ui/skeleton";
-import { ProductCard } from '@/components/admin/ProductCard';
+import { ProductCard } from '@/components/admin/products/ProductCard';
+import { ProductListSkeleton } from './components/ProductListSkeleton';
+import { ProductSearchFilters } from './components/ProductSearchFilters';
+import { ProductGrid } from './components/ProductGrid';
 
 // Helper function for debounce
 function useDebounce<T>(value: T, delay: number): T {

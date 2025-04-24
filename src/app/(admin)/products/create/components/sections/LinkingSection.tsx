@@ -34,34 +34,15 @@ interface LinkingSectionProps {
 const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormState, categories, currentProductId }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Pick<Product, 'id' | 'name'>[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>(formState.relatedProductsData ?? []);
   const [isLoadingSearch, setIsLoadingSearch] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
 
-  // Effect to fetch initial product details
   useEffect(() => {
-    let isMounted = true;
-    const fetchInitialProducts = async () => {
-      // This logic relies on internal state (`selectedProducts`), not directly on formState for initial IDs
-      // We need to get the initial IDs from the parent formState if they exist elsewhere
-      // Assuming the parent state *doesn't* hold initial related product IDs directly:
-      // Let the component manage its selected products entirely based on search/add/remove
-      // OR If parent *should* provide initial IDs (e.g., via a different prop or potentially formState.someOtherField?)
-      // We need to clarify how initial related products are passed.
-      // For now, assume it starts empty or relies on internal logic if needed.
-      setIsInitialLoad(false); // Simplify: Assume we don't load initial related products from parent state this way
-      /* 
-      const relatedProductIds = formState.relatedProductsIds ?? []; // This field doesn't exist
-      if (relatedProductIds.length > 0 && isInitialLoad) { ... }
-      */
-    };
-    fetchInitialProducts();
-    return () => { isMounted = false; };
-  }, [isInitialLoad]);
+    setSelectedProducts(formState.relatedProductsData ?? []);
+  }, [formState.relatedProductsData]);
 
-  // Effect to search products when debounced query changes
   useEffect(() => {
     if (debouncedSearchQuery.trim().length < 2) {
       setSearchResults([]);
@@ -76,10 +57,9 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
         const results = await productApi.searchByName(debouncedSearchQuery);
         console.log("Search results raw:", results);
         
-        // Filter out already selected products AND the current product being edited
         const availableResults = results.filter(
           (result) => 
-            result.id !== currentProductId && // Exclude current product
+            result.id !== currentProductId &&
             !selectedProducts.some((selected) => selected.id === result.id)
         );
 
@@ -102,7 +82,7 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
     searchProducts();
 
     return () => {
-        isMounted = false; // Cleanup
+        isMounted = false;
     };
 
   }, [debouncedSearchQuery, selectedProducts, currentProductId]);
@@ -111,8 +91,7 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
     if (!selectedProducts.some(p => p.id === product.id)) {
       const newSelectedProducts = [...selectedProducts, { id: product.id, name: product.name }];
       setSelectedProducts(newSelectedProducts);
-      // REMOVE call to updateFormState as parent doesn't track this
-      // updateFormState({ relatedProductsIds: newSelectedProducts.map(p => p.id) });
+      updateFormState({ relatedProductIds: newSelectedProducts.map(p => p.id) });
     }
     setSearchQuery('');
     setSearchResults([]);
@@ -121,8 +100,7 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
   const handleRemoveProduct = (productId: string) => {
     const newSelectedProducts = selectedProducts.filter((p) => p.id !== productId);
     setSelectedProducts(newSelectedProducts);
-    // REMOVE call to updateFormState as parent doesn't track this
-    // updateFormState({ relatedProductsIds: newSelectedProducts.map(p => p.id) });
+    updateFormState({ relatedProductIds: newSelectedProducts.map(p => p.id) });
   };
 
   return (
@@ -156,8 +134,6 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm theo tên sản phẩm..."
               autoComplete="off"
-              // Disable prop doesn't depend on formState related products
-              disabled={isInitialLoad} 
             />
             {(isLoadingSearch || searchResults.length > 0 || (searchQuery.length >= 2 && !isLoadingSearch && searchResults.length === 0) ) && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -182,24 +158,19 @@ const LinkingSection: React.FC<LinkingSectionProps> = ({ formState, updateFormSt
            
             {/* Display Selected Products */}
             <div className="mt-2 flex flex-wrap gap-2 min-h-[24px]">
-              {/* Skeleton/Display logic depends on internal `selectedProducts` state, not formState */}
-              {isInitialLoad ? (
-                 <Skeleton className="h-6 w-24 rounded-full" /> // Show one skeleton while loading?
-              ) : (
-                  selectedProducts.map((product) => (
-                    <Badge key={product.id} variant="secondary" className="flex items-center gap-1">
-                      {product.name}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveProduct(product.id)}
-                        className="ml-1 p-0.5 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-1 focus:ring-ring"
-                        aria-label={`Remove ${product.name}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))
-              )}
+              {selectedProducts.map((product) => (
+                <Badge key={product.id} variant="secondary" className="flex items-center gap-1">
+                  {product.name}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveProduct(product.id)}
+                    className="ml-1 p-0.5 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-1 focus:ring-ring"
+                    aria-label={`Remove ${product.name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
             </div>
           </div>
          

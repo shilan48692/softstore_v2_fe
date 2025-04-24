@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { z } from 'zod';
 
 const API_URL = '/api'; // Sử dụng relative path để rewrite hoạt động
 
@@ -92,6 +93,7 @@ export interface Product {
   
   categoryId: string | null;
   additionalRequirementIds: string[];
+  Product_A?: { id: string; name: string }[];
   
   customHeadCode: string;
   customBodyCode: string;
@@ -243,6 +245,23 @@ export const productApi = {
       return []; 
     }
   },
+
+  // Re-added function to fetch multiple products by their IDs
+  getProductsByIds: async (ids: string[]): Promise<Pick<Product, 'id' | 'name'>[]> => {
+    if (ids.length === 0) return [];
+    try {
+      // Assume a backend endpoint like /products/batch?ids=id1,id2...
+      // Adjust endpoint and parameter name ('ids') if needed
+      const response = await apiClient.get<Pick<Product, 'id' | 'name'>[]>('/products/batch', {
+        params: { ids: ids.join(',') } 
+      });
+      // Assuming the API returns an array of products directly
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching products by IDs:', error);
+      return []; // Return empty array on error
+    }
+  },
 };
 
 // (Optional) Có thể tạo một object API riêng cho categories
@@ -257,6 +276,121 @@ export const categoryApi = {
       // Hoặc throw error để component cha xử lý
       throw error; // Re-throw error instead of returning empty array directly
       // return { success: false, statusCode: 500, message: 'Error fetching categories', data: [] }; // Alternative: return error structure
+    }
+  },
+};
+
+// --- Key Management Enums and Types ---
+export enum KeyStatus {
+  AVAILABLE = 'AVAILABLE',
+  SOLD = 'SOLD',
+  USED = 'USED',
+}
+
+export interface ActivationKey {
+  id: string;
+  activationCode: string;
+  productId: string;
+  product?: Pick<Product, 'id' | 'name'>; // Include product name for display
+  status: KeyStatus;
+  userEmail?: string | null;
+  note?: string | null;
+  cost?: number | null;
+  createdAt: string; // ISO Date string
+  updatedAt: string; // ISO Date string
+}
+
+export interface SearchParams {
+  page?: number;
+  limit?: number;
+  activationCode?: string;
+  productId?: string;
+  status?: KeyStatus;
+  userEmail?: string;
+  note?: string;
+  minCost?: number;
+  maxCost?: number;
+  sortBy?: string; // e.g., 'createdAt'
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface PaginatedKeysResponse {
+  data: ActivationKey[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+// Zod Schemas for Validation
+export const AddKeySchema = z.object({
+  activationCode: z.string().min(1, { message: "Mã key không được để trống" }),
+  productId: z.string().min(1, { message: "Vui lòng chọn sản phẩm" }),
+  status: z.nativeEnum(KeyStatus).default(KeyStatus.AVAILABLE),
+  cost: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+    z.number().min(0, "Giá nhập phải lớn hơn hoặc bằng 0").nullable().optional() // Allow null and optional
+  ),
+  note: z.string().optional(),
+});
+
+export type AddKeyInput = z.infer<typeof AddKeySchema>;
+
+// Edit schema - allow editing status, cost, note. Product and code usually fixed.
+export const EditKeySchema = z.object({
+  status: z.nativeEnum(KeyStatus),
+  cost: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+    z.number().min(0, "Giá nhập phải lớn hơn hoặc bằng 0").nullable().optional()
+  ),
+  note: z.string().optional(),
+  // Keep productId and activationCode as read-only or handled separately if needed
+  // productId: z.string().optional(),
+  // activationCode: z.string().optional(),
+});
+
+export type EditKeyInput = z.infer<typeof EditKeySchema>;
+
+// --- Key Management API Functions ---
+
+export const keyApi = {
+  search: async (params: SearchParams): Promise<PaginatedKeysResponse> => {
+    try {
+      const response = await apiClient.get<PaginatedKeysResponse>('/admin/keys/search', { params });
+      // Assuming API response directly matches PaginatedKeysResponse
+      return response.data;
+    } catch (error) {
+      console.error("Error searching keys:", error);
+      throw error;
+    }
+  },
+
+  create: async (data: AddKeyInput): Promise<ActivationKey> => {
+    try {
+      const response = await apiClient.post<ActivationKey>('/admin/keys', data);
+      return response.data;
+    } catch (error) {
+      console.error("Error creating key:", error);
+      throw error;
+    }
+  },
+
+  update: async (id: string, data: EditKeyInput): Promise<ActivationKey> => {
+    try {
+      const response = await apiClient.patch<ActivationKey>(`/admin/keys/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating key ${id}:`, error);
+      throw error;
+    }
+  },
+
+  delete: async (id: string): Promise<void> => {
+    try {
+      await apiClient.delete(`/admin/keys/${id}`);
+    } catch (error) {
+      console.error(`Error deleting key ${id}:`, error);
+      throw error;
     }
   },
 };

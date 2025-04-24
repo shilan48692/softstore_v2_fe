@@ -37,6 +37,8 @@ export interface FormState {
   // Linking section
   relatedProducts?: string[]; // Added for consistency (was in create)
   additionalRequirementIds?: string[]; // Changed from additionalRequirements in create page
+  relatedProductIds?: string[]; // Re-added field for related products
+  relatedProductsData?: { id: string; name: string }[]; // Add this to store fetched data {id, name}
 
   // Popup section
   popupTitle?: string;

@@ -12,9 +12,8 @@ import {
 } from '@/components/ui/tooltip';
 import { ImageOff, Edit, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// Assuming you have a Product type definition in @/types or similar
 // Adjust the import path if necessary
-import { Product } from '@/types';
+import { Product } from '@/services/api';
 
 interface ProductCardProps {
   product: Product;

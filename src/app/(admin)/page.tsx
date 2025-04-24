@@ -14,10 +14,10 @@ const HomePage = () => {
       href: '/products',
     },
     {
-      title: 'Mã kích hoạt',
-      description: 'Quản lý mã kích hoạt, tạo mã mới, kiểm tra trạng thái',
+      title: 'Quản lý Key',
+      description: 'Thêm, sửa, xóa và quản lý key kích hoạt.',
       icon: <Key className="h-8 w-8 text-blue-600" />,
-      href: '/activation-codes',
+      href: '/keys',
     },
     {
       title: 'Đơn hàng',

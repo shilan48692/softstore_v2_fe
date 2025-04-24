@@ -43,7 +43,7 @@ const sidebarItems: SidebarItem[] = [
   },
   {
     name: 'Mã kích hoạt',
-    href: '/activation-codes',
+    href: '/keys',
     icon: <Key className="h-5 w-5" />,
   },
   {
