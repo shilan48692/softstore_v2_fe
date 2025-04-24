@@ -34,6 +34,7 @@ import { debounce } from 'lodash';
 import { keyApi, ActivationKey, KeyStatus, PaginatedKeysResponse, SearchParams as KeySearchParams, productApi, Product } from '@/services/api'; // Updated to use consolidated api.ts
 import { KeyDialog } from '@/components/admin/keys/KeyDialog';
 import { KeyTable } from '@/components/admin/keys/KeyTable';
+import { Trash2 as TrashIcon } from 'lucide-react'; // Import Trash2 with alias
 
 const DEFAULT_LIMIT = 10;
 
@@ -50,6 +51,10 @@ const KeysManagementPage = () => {
 
   // State for product list (for dropdowns)
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
+
+  // ---> NEW: State for selected keys and bulk delete loading
+  const [selectedKeyIds, setSelectedKeyIds] = useState<string[]>([]);
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false);
 
   // Debounce search term
   const debouncedSetSearch = useCallback(debounce((value: string) => {
@@ -228,6 +233,54 @@ const KeysManagementPage = () => {
     closeDialogs(); // Close the Add/Edit dialog on success
   };
 
+  // ---> NEW: Handlers for row selection
+  const handleSelectKey = (id: string, checked: boolean) => {
+    setSelectedKeyIds((prevSelected) =>
+      checked
+        ? [...prevSelected, id]
+        : prevSelected.filter((selectedId) => selectedId !== id)
+    );
+  };
+
+  const handleSelectAllKeys = (checked: boolean) => {
+    if (checked && keyData?.data) {
+      setSelectedKeyIds(keyData.data.map((key) => key.id));
+    } else {
+      setSelectedKeyIds([]);
+    }
+  };
+
+  // ---> NEW: Handler for deleting selected keys
+  const handleDeleteSelected = async () => {
+    if (selectedKeyIds.length === 0) return;
+
+    const confirmation = window.confirm(
+      `Bạn có chắc chắn muốn xóa ${selectedKeyIds.length} key đã chọn không? Hành động này không thể hoàn tác.`
+    );
+
+    if (confirmation) {
+      setIsDeletingSelected(true);
+      toast.promise(
+        keyApi.deleteBulk(selectedKeyIds), // Assuming keyApi.deleteBulk exists
+        {
+          loading: `Đang xóa ${selectedKeyIds.length} key...`,
+          success: () => {
+            setSelectedKeyIds([]); // Clear selection
+            revalidateKeys();    // Revalidate data
+            return `Đã xóa ${selectedKeyIds.length} key thành công.`;
+          },
+          error: (err: any) => {
+            console.error("Error deleting selected keys:", err);
+            return err?.response?.data?.message || 'Lỗi xóa các key đã chọn.';
+          },
+          finally: () => {
+            setIsDeletingSelected(false);
+          }
+        }
+      );
+    }
+  };
+
   // Error Handling for SWR
   useEffect(() => {
     if (error) {
@@ -250,9 +303,25 @@ const KeysManagementPage = () => {
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <CardTitle className="text-2xl font-bold">Quản lý Key Kích Hoạt</CardTitle>
-            <Button onClick={openAddDialog}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Thêm Key
-            </Button>
+            {/* Modified Button Group */}
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline"
+                onClick={handleDeleteSelected}
+                disabled={selectedKeyIds.length === 0 || isDeletingSelected}
+                className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                {isDeletingSelected ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <TrashIcon className="mr-2 h-4 w-4" />
+                )}
+                Xóa đã chọn ({selectedKeyIds.length})
+              </Button>
+              <Button onClick={openAddDialog}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Thêm Key
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -338,8 +407,11 @@ const KeysManagementPage = () => {
                 isLoading={isLoading}
                 onEdit={openEditDialog}
                 onDelete={handleDeleteRequest}
+                selectedIds={selectedKeyIds} // Pass state down
+                onSelectChange={handleSelectKey} // Pass handler down
+                onSelectAllChange={handleSelectAllKeys} // Pass handler down
               />
-              {/* Pagination */}
+              {/* Pagination - Moved outside KeyTable, uses CardFooter */}
               {totalPages > 1 && (
                 <CardFooter className="pt-6 flex justify-center">
                   <Pagination>
@@ -347,7 +419,7 @@ const KeysManagementPage = () => {
                       <PaginationItem>
                         <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }} aria-disabled={currentPage === 1} tabIndex={currentPage === 1 ? -1 : undefined} className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined} />
                       </PaginationItem>
-                      {/* Dynamically generate page links - consider showing ellipsis for many pages */}
+                      {/* Simple page number rendering - Consider adding ellipsis for many pages */}
                       {[...Array(totalPages).keys()].map((page) => (
                         <PaginationItem key={page + 1}>
                           <PaginationLink href="#" onClick={(e) => { e.preventDefault(); handlePageChange(page + 1); }} isActive={currentPage === page + 1}>

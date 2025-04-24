@@ -22,12 +22,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { ActivationKey, KeyStatus } from '@/services/api';
 import { Skeleton } from "@/components/ui/skeleton"; // For loading state
+import { Checkbox } from "../../ui/checkbox"; // Using relative path
 
 interface KeyTableProps {
   keys: ActivationKey[];
   isLoading: boolean;
   onEdit: (key: ActivationKey) => void;
   onDelete: (key: ActivationKey) => void;
+  selectedIds: string[]; // Add prop for selected IDs
+  onSelectChange: (id: string, checked: boolean) => void; // Add prop for row select change
+  onSelectAllChange: (checked: boolean) => void; // Add prop for select all change
   // Optional props for pagination, sorting if handled here
 }
 
@@ -45,16 +49,31 @@ const getStatusBadgeVariant = (status: KeyStatus): "default" | "secondary" | "de
   }
 };
 
-export const KeyTable: React.FC<KeyTableProps> = ({ keys, isLoading, onEdit, onDelete }) => {
+export const KeyTable: React.FC<KeyTableProps> = ({ 
+  keys, 
+  isLoading, 
+  onEdit, 
+  onDelete, 
+  selectedIds, 
+  onSelectChange, 
+  onSelectAllChange 
+}) => {
   
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onSelectAllChange(event.target.checked);
+  };
+
+  const isAllSelected = keys.length > 0 && selectedIds.length === keys.length;
+  const isIndeterminate = selectedIds.length > 0 && selectedIds.length < keys.length;
+
   if (isLoading) {
-    // Render skeleton loaders
+    // Render skeleton loaders (Add skeleton for checkbox column)
     return (
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              {/* Adjust skeleton count and widths as needed */}
+              <TableHead className="w-[40px]"><Skeleton className="h-5 w-5" /></TableHead> {/* Checkbox Skeleton */}
               <TableHead><Skeleton className="h-5 w-32" /></TableHead>
               <TableHead><Skeleton className="h-5 w-24" /></TableHead>
               <TableHead><Skeleton className="h-5 w-20" /></TableHead>
@@ -62,12 +81,15 @@ export const KeyTable: React.FC<KeyTableProps> = ({ keys, isLoading, onEdit, onD
               <TableHead><Skeleton className="h-5 w-24" /></TableHead>
               <TableHead><Skeleton className="h-5 w-16" /></TableHead>
               <TableHead><Skeleton className="h-5 w-24" /></TableHead>
+              <TableHead><Skeleton className="h-5 w-24" /></TableHead>
               <TableHead><Skeleton className="h-5 w-12" /></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {[...Array(5)].map((_, index) => (
               <TableRow key={`skeleton-${index}`}>
+                 <TableCell><Skeleton className="h-4 w-4" /></TableCell> {/* Checkbox Skeleton */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-full" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-full" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-full" /></TableCell>
@@ -93,6 +115,14 @@ export const KeyTable: React.FC<KeyTableProps> = ({ keys, isLoading, onEdit, onD
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-[40px]">
+              <Checkbox 
+                checked={isAllSelected}
+                onCheckedChange={(checked: boolean) => onSelectAllChange(Boolean(checked))} // Add type
+                aria-label="Select all rows"
+                data-state={isIndeterminate ? 'indeterminate' : (isAllSelected ? 'checked' : 'unchecked')} // Handle indeterminate state visually
+              />
+            </TableHead>
             <TableHead>Mã Key</TableHead>
             <TableHead>Sản phẩm</TableHead>
             <TableHead>Trạng thái</TableHead>
@@ -100,21 +130,32 @@ export const KeyTable: React.FC<KeyTableProps> = ({ keys, isLoading, onEdit, onD
             <TableHead>Ghi chú</TableHead>
             <TableHead>Giá nhập</TableHead>
             <TableHead>Ngày tạo</TableHead>
+            <TableHead>Ngày sử dụng</TableHead>
             <TableHead className="text-right">Hành động</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {keys.map((key) => (
-            <TableRow key={key.id}>
+            <TableRow key={key.id} data-state={selectedIds.includes(key.id) ? "selected" : undefined}>
+               <TableCell>
+                 <Checkbox
+                   checked={selectedIds.includes(key.id)}
+                   onCheckedChange={(checked: boolean) => onSelectChange(key.id, Boolean(checked))} // Add type
+                   aria-label={`Select row ${key.id}`}
+                 />
+               </TableCell>
               <TableCell className="font-medium">{key.activationCode}</TableCell>
-              <TableCell>{key.product?.name || key.productId}</TableCell> {/* Display product name or ID */}
+              <TableCell>{key.product?.name || key.productId}</TableCell>
               <TableCell>
                 <Badge variant={getStatusBadgeVariant(key.status)}>{key.status}</Badge>
               </TableCell>
               <TableCell>{key.userEmail || '-'}</TableCell>
               <TableCell className="max-w-xs truncate" title={key.note || ''}>{key.note || '-'}</TableCell>
-              <TableCell>{key.cost != null ? key.cost.toLocaleString('vi-VN') : '-'}</TableCell> {/* Format cost */}
-              <TableCell>{format(new Date(key.createdAt), 'dd/MM/yyyy HH:mm')}</TableCell> {/* Format date */}
+              <TableCell>{key.cost != null ? key.cost.toLocaleString('vi-VN') : '-'}</TableCell>
+              <TableCell>{format(new Date(key.createdAt), 'dd/MM/yyyy HH:mm')}</TableCell>
+              <TableCell>
+                {key.usedAt ? format(new Date(key.usedAt), 'dd/MM/yyyy HH:mm') : '-'}
+              </TableCell>
               <TableCell className="text-right">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>

@@ -298,6 +298,7 @@ export interface ActivationKey {
   cost?: number | null;
   createdAt: string; // ISO Date string
   updatedAt: string; // ISO Date string
+  usedAt?: string | null; // Added usedAt field
 }
 
 export interface SearchParams {
@@ -390,6 +391,19 @@ export const keyApi = {
       await apiClient.delete(`/admin/keys/${id}`);
     } catch (error) {
       console.error(`Error deleting key ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // ---> NEW: Function to delete multiple keys
+  deleteBulk: async (ids: string[]): Promise<{ deletedCount: number }> => {
+    if (ids.length === 0) return { deletedCount: 0 };
+    try {
+      // Reverted endpoint back to /admin/keys/bulk, keeping POST method
+      const response = await apiClient.post<{ deletedCount: number }>('/admin/keys/bulk', { ids }); 
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting multiple keys:`, error);
       throw error;
     }
   },
