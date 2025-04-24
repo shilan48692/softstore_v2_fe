@@ -284,7 +284,7 @@ export const categoryApi = {
 export enum KeyStatus {
   AVAILABLE = 'AVAILABLE',
   SOLD = 'SOLD',
-  USED = 'USED',
+  EXPORTED = 'EXPORTED',
 }
 
 export interface ActivationKey {
