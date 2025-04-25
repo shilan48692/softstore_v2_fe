@@ -90,7 +90,7 @@ Response:
     "quantity": number,
     "autoSyncQuantityWithKey": boolean,
     "minPerOrder": number,
-    "maxPerOrder": number,
+    "maxPerOrder": number | null,
     "autoDeliverKey": boolean,
     "showMoreDescription": boolean,
     "promotionEnabled": boolean,
@@ -100,10 +100,10 @@ Response:
     "expiryDays": number,
     "allowComment": boolean,
     
-    "promotionPrice": number,
-    "promotionStartDate": "datetime",
-    "promotionEndDate": "datetime",
-    "promotionQuantity": number,
+    "promotionPrice": number | null,
+    "promotionStartDate": "datetime" | null,
+    "promotionEndDate": "datetime" | null,
+    "promotionQuantity": number | null,
     
     "categoryId": "string",
     "additionalRequirementIds": ["string"],
@@ -167,7 +167,7 @@ Content-Type: application/json
   "quantity": number,
   "autoSyncQuantityWithKey": boolean,
   "minPerOrder": number,
-  "maxPerOrder": number,
+  "maxPerOrder": number | null,
   "autoDeliverKey": boolean,
   "showMoreDescription": boolean,
   "promotionEnabled": boolean,
@@ -177,10 +177,10 @@ Content-Type: application/json
   "expiryDays": number,
   "allowComment": boolean,
   
-  "promotionPrice": number,
-  "promotionStartDate": "datetime",
-  "promotionEndDate": "datetime",
-  "promotionQuantity": number,
+  "promotionPrice": number | null,
+  "promotionStartDate": "datetime" | null,
+  "promotionEndDate": "datetime" | null,
+  "promotionQuantity": number | null,
   
   "categoryId": "string",
   "additionalRequirementIds": ["string"],
@@ -226,7 +226,7 @@ Content-Type: application/json
   "quantity": number,
   "autoSyncQuantityWithKey": boolean,
   "minPerOrder": number,
-  "maxPerOrder": number,
+  "maxPerOrder": number | null,
   "autoDeliverKey": boolean,
   "showMoreDescription": boolean,
   "promotionEnabled": boolean,
@@ -236,10 +236,10 @@ Content-Type: application/json
   "expiryDays": number,
   "allowComment": boolean,
   
-  "promotionPrice": number,
-  "promotionStartDate": "datetime",
-  "promotionEndDate": "datetime",
-  "promotionQuantity": number,
+  "promotionPrice": number | null,
+  "promotionStartDate": "datetime" | null,
+  "promotionEndDate": "datetime" | null,
+  "promotionQuantity": number | null,
   
   "categoryId": "string",
   "additionalRequirementIds": ["string"],
@@ -253,6 +253,112 @@ Content-Type: application/json
 ```http
 DELETE /admin/products/:id
 Authorization: Bearer your-token
+```
+
+## Import Sources (Admin only)
+
+**Authentication Required:** All endpoints require a valid admin JWT token in the `Authorization: Bearer <token>` header.
+
+### Get All Import Sources
+```http
+GET /admin/import-sources
+```
+
+Response:
+```json
+[
+  {
+    "id": "string (uuid)",
+    "name": "string",
+    "contactLink": "string | null",
+    "createdAt": "datetime",
+    "updatedAt": "datetime"
+  }
+]
+```
+
+### Get Import Source by ID
+```http
+GET /admin/import-sources/:id
+```
+
+Response: Same as import source object above.
+
+### Create Import Source
+```http
+POST /admin/import-sources
+Content-Type: application/json
+
+{
+  "name": "string (required, unique)",
+  "contactLink": "string (optional, must be a valid URL)"
+}
+```
+
+Response: The newly created import source object.
+
+### Update Import Source
+```http
+PATCH /admin/import-sources/:id
+Content-Type: application/json
+
+{
+  "name": "string (optional, unique)",
+  "contactLink": "string (optional, must be a valid URL)"
+}
+```
+
+Response: The updated import source object.
+
+### Delete Import Source
+```http
+DELETE /admin/import-sources/:id
+```
+
+**Note:** Deletion will fail if the import source is currently associated with any keys.
+
+Response (on success):
+```json
+{
+  "message": "Import source with ID <id> deleted successfully."
+}
+```
+
+### Search Import Sources
+```http
+GET /admin/import-sources/search
+```
+
+**Query Parameters:**
+- `name` (string): Tìm theo tên nguồn nhập (chứa, không phân biệt hoa thường).
+- `page` (number, default: 1): Trang hiện tại.
+- `limit` (number, default: 10): Số lượng kết quả mỗi trang.
+
+**Example Usage:**
+```
+GET /admin/import-sources/search?name=NguonA&page=1&limit=20
+```
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": "string (uuid)",
+      "name": "string",
+      "contactLink": "string | null",
+      "createdAt": "datetime",
+      "updatedAt": "datetime"
+    }
+    // ... more sources
+  ],
+  "meta": {
+    "total": number, // Total number of sources matching the criteria
+    "page": number,
+    "limit": number,
+    "totalPages": number
+  }
+}
 ```
 
 ## Orders
@@ -368,39 +474,132 @@ Response:
 }
 ```
 
-### Get All Keys
+### Get All Keys (Admin only)
 ```http
-GET /keys
+GET /admin/keys
+Authorization: Bearer your-token
+```
+Response: Array of key objects with product and importSource included.
+
+### Get Key by ID (Admin only)
+```http
+GET /admin/keys/:id
+Authorization: Bearer your-token
+```
+Response: Single key object with product and importSource included.
+
+### Get Key by Activation Code (Admin only)
+```http
+GET /admin/keys/by-activation-code/:activationCode
+Authorization: Bearer your-token
+```
+Response: Single key object with product and importSource included.
+
+### Search Keys (Admin only)
+```http
+GET /admin/keys/search
 Authorization: Bearer your-token
 ```
 
-Response: Array of key objects
+**Query Parameters:**
+- `productName` (string): Tìm theo tên sản phẩm (chứa, không phân biệt hoa thường).
+- `activationCode` (string): Tìm theo mã kích hoạt (chứa, không phân biệt hoa thường).
+- `orderId` (string): Lọc theo ID đơn hàng chính xác.
+- `status` (KeyStatus): Lọc theo trạng thái key (`AVAILABLE`, `SOLD`, `EXPORTED`).
+- `note` (string): Tìm theo nội dung note (chứa, không phân biệt hoa thường).
+- `importSourceId` (string): Lọc theo ID nguồn nhập.
+- `minCost` (number): Giá gốc tối thiểu.
+- `maxCost` (number): Giá gốc tối đa.
+- `createdAtFrom` (string, YYYY-MM-DD): Lọc theo ngày tạo từ.
+- `createdAtTo` (string, YYYY-MM-DD): Lọc theo ngày tạo đến.
+- `usedAtFrom` (string, YYYY-MM-DD): Lọc theo ngày bán/sử dụng từ.
+- `usedAtTo` (string, YYYY-MM-DD): Lọc theo ngày bán/sử dụng đến.
+- `page` (number, default: 1): Trang hiện tại.
+- `limit` (number, default: 10): Số lượng kết quả mỗi trang.
 
-### Get Key by ID
-```http
-GET /keys/:id
-Authorization: Bearer your-token
+**Example Usage:**
+```
+GET /admin/keys/search?status=AVAILABLE&importSourceId=uuid-cua-nguon-nhap&page=1&limit=20
 ```
 
-Response: Single key object
-
-### Get Key by Activation Code
-```http
-GET /keys/by-activation-code/:activationCode
-Authorization: Bearer your-token
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": "string",
+      "activationCode": "string",
+      "note": "string | null",
+      "cost": number,
+      "status": "AVAILABLE | SOLD | EXPORTED",
+      "createdAt": "datetime",
+      "updatedAt": "datetime",
+      "usedAt": "datetime | null",
+      "productId": "string",
+      "orderId": "string | null",
+      "userId": "string | null",
+      "userEmail": "string | null",
+      "importSourceId": "string | null",
+      "product": { // Product details included
+        "id": "string",
+        "name": "string",
+        // ... other product fields ...
+      },
+      "importSource": { // Import source details included
+        "id": "string",
+        "name": "string",
+        "contactLink": "string | null"
+        // ... other import source fields ...
+      } | null
+    }
+    // ... more keys
+  ],
+  "meta": {
+    "total": number, // Total number of keys matching the criteria
+    "page": number,
+    "limit": number,
+    "totalPages": number
+  }
+}
 ```
 
-Response: Single key object
-
-### Update Key Status (Admin only)
+### Update Key (Admin only)
 ```http
-PATCH /keys/:id
+PATCH /admin/keys/:id
 Authorization: Bearer your-token
 Content-Type: application/json
 
 {
-  "status": "string",
-  "expiresAt": "datetime"
+  "productId": "string (optional)",
+  "activationCode": "string (optional)",
+  "status": "AVAILABLE | SOLD | EXPORTED (optional)",
+  "note": "string (optional)",
+  "cost": number (optional),
+  "importSourceId": "string (optional)"
+}
+```
+
+### Delete Key (Admin only)
+```http
+DELETE /admin/keys/:id
+Authorization: Bearer your-token
+```
+
+### Delete Bulk Keys (Admin only)
+```http
+POST /admin/keys/delete-bulk
+Authorization: Bearer your-token
+Content-Type: application/json
+
+{
+  "ids": ["string", "string", ...]
+}
+```
+
+Response:
+```json
+{
+  "count": number // Number of keys deleted
 }
 ```
 

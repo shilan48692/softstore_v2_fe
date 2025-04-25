@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormState, FormUpdateCallback } from '@/types/productForm';
 import CKEditor4Field from '@/components/CKEditor4Field';
+import { ImportSourceSearchInput } from '@/components/shared/ImportSourceSearchInput';
 
 interface ProductDataSectionProps {
   formState: FormState;
@@ -180,10 +181,10 @@ const ProductDataSection: React.FC<ProductDataSectionProps> = ({ formState, upda
           <div className="space-y-4">
             <div>
               <Label htmlFor="importSource">Nguồn Nhập</Label>
-              <Input
-                id="importSource"
+              <ImportSourceSearchInput
                 value={formState.importSource}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => updateFormState({ importSource: e.target.value })}
+                onChange={(value) => updateFormState({ importSource: value })}
+                placeholder="Tìm hoặc nhập nguồn nhập..."
               />
             </div>
              <div>

@@ -29,21 +29,20 @@ import {
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationLink, PaginationNext } from "@/components/ui/pagination";
 import { Badge } from '@/components/ui/badge';
-import { debounce } from 'lodash';
 
 import { keyApi, ActivationKey, KeyStatus, PaginatedKeysResponse, SearchParams as KeySearchParams, productApi, Product } from '@/services/api'; // Updated to use consolidated api.ts
 import { KeyDialog } from '@/components/admin/keys/KeyDialog';
 import { KeyTable } from '@/components/admin/keys/KeyTable';
 import { Trash2 as TrashIcon } from 'lucide-react'; // Import Trash2 with alias
+import { ProductSearchInput } from '@/components/shared/ProductSearchInput'; // Renamed ProductOption export in its file
+import { ImportSourceSearchInput, ImportSourceOption } from '@/components/shared/ImportSourceSearchInput'; // Import ImportSource search component and its option type
 
 const DEFAULT_LIMIT = 10;
 
 const KeysManagementPage = () => {
-  // State for filters
+  // State for filters - Include new date filters and importSourceId
   const [filters, setFilters] = useState<Omit<KeySearchParams, 'page' | 'limit'>>({});
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   
   // State for dialogs
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
@@ -51,24 +50,12 @@ const KeysManagementPage = () => {
 
   // State for product list (for dropdowns)
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
+  // State to hold the name of the selected import source for the filter input
+  const [filterImportSource, setFilterImportSource] = useState<ImportSourceOption | null>(null);
 
   // ---> NEW: State for selected keys and bulk delete loading
   const [selectedKeyIds, setSelectedKeyIds] = useState<string[]>([]);
   const [isDeletingSelected, setIsDeletingSelected] = useState(false);
-
-  // Debounce search term
-  const debouncedSetSearch = useCallback(debounce((value: string) => {
-    setDebouncedSearchTerm(value);
-    setCurrentPage(1); // Reset page when search term changes
-  }, 500), []); // 500ms delay
-
-  useEffect(() => {
-    debouncedSetSearch(searchTerm);
-    // Cleanup function to cancel debounce on unmount
-    return () => {
-      debouncedSetSearch.cancel();
-    };
-  }, [searchTerm, debouncedSetSearch]);
 
   // Fetch product list on mount
   useEffect(() => {
@@ -85,18 +72,13 @@ const KeysManagementPage = () => {
     fetchProducts();
   }, []);
 
-  // SWR Key for data fetching
-  const getSwrKey = (page: number, currentFilters: Omit<KeySearchParams, 'page' | 'limit'>, searchTerm: string): string | null => {
+  // SWR Key for data fetching - remove searchTerm parameter
+  const getSwrKey = (page: number, currentFilters: Omit<KeySearchParams, 'page' | 'limit'>): string | null => {
     const params: Partial<KeySearchParams> = {
         ...currentFilters,
         page,
         limit: DEFAULT_LIMIT,
     };
-    // Use searchTerm for activationCode filter if it exists
-    if (searchTerm) {
-       params.activationCode = searchTerm;
-    }
-
     // Remove undefined/null/empty string values before creating search params
     Object.keys(params).forEach(key => {
         const typedKey = key as keyof KeySearchParams;
@@ -117,7 +99,7 @@ const KeysManagementPage = () => {
     return `${basePath}?${new URLSearchParams(stringParams).toString()}`;
   };
 
-  // SWR Fetcher function
+  // SWR Fetcher function (no change needed here, it already handles various param types)
   const fetcher = (url: string): Promise<PaginatedKeysResponse> => {
     const searchParams = new URLSearchParams(url.split('?')[1] || '');
     // Convert URLSearchParams to an object suitable for keyApi.search
@@ -140,18 +122,21 @@ const KeysManagementPage = () => {
     return keyApi.search(paramsObject as KeySearchParams); // Pass the object, cast to expected type
   }
 
-  // useSWR hook
-  const swrKey = getSwrKey(currentPage, filters, debouncedSearchTerm);
+  // useSWR hook - remove debouncedSearchTerm dependency
+  const swrKey = getSwrKey(currentPage, filters);
   const { data: keyData, error, isLoading, mutate: revalidateKeys } = useSWR<PaginatedKeysResponse>(
     swrKey,
     fetcher,
     { revalidateOnFocus: false } // Optional: disable revalidation on window focus
   );
 
-  // Handlers for filters
+  // Handlers for filters - handleFilterChange now handles text and date inputs
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => { // Add type
-    const { name, value } = e.target;
-    setFilters((prev: Omit<KeySearchParams, 'page' | 'limit'>) => ({ ...prev, [name]: value === '' ? undefined : value }));
+    const { name, value, type } = e.target;
+    setFilters((prev: Omit<KeySearchParams, 'page' | 'limit'>) => ({
+       ...prev, 
+       [name]: value === '' ? undefined : value 
+      }));
     setCurrentPage(1); // Reset page on filter change
   };
 
@@ -173,17 +158,30 @@ const KeysManagementPage = () => {
     setCurrentPage(1); // Reset page on filter change
   };
 
-  // Handler for search input change
-  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
+  // NEW: Handler specifically for ProductSearchInput
+  const handleProductFilterChange = (selectedOption: { id: string; name: string } | undefined) => {
+    setFilters((prev) => ({
+      ...prev,
+      productId: selectedOption?.id,
+    }));
+    setCurrentPage(1);
   };
 
-  // Combined reset function
+  // NEW: Handler for Import Source Filter Input
+  const handleImportSourceFilterChange = (selectedOption: ImportSourceOption | undefined) => {
+    setFilters(prev => ({
+      ...prev,
+      importSourceId: selectedOption?.id // Update the ID in filters
+    }));
+    setFilterImportSource(selectedOption ?? null); // Update the object state for display
+    setCurrentPage(1); // Reset page on filter change
+  };
+
+  // Combined reset function - clear import source filter as well
   const resetFiltersAndSearch = () => {
     setFilters({});
-    setSearchTerm(''); // Clear search input, triggers debounced update
-    // setCurrentPage(1); // Debounced effect already resets page
-    // No need to call revalidateKeys here explicitly
+    setFilterImportSource(null); // Reset import source filter display state
+    setCurrentPage(1);
   };
 
   // Handlers for Dialogs
@@ -297,6 +295,11 @@ const KeysManagementPage = () => {
     }
   };
 
+  // Find initial product name for the search input
+  const initialProductName = filters.productId
+    ? products.find(p => p.id === filters.productId)?.name
+    : null;
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <Card>
@@ -325,49 +328,46 @@ const KeysManagementPage = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Filter Section */}
+          {/* Filter Section - Updated Layout */} 
           <div className="mb-6 p-4 border rounded-lg bg-muted/40">
             <div className="flex justify-between items-center mb-3">
-               <h3 className="text-lg font-semibold">Bộ lọc và Tìm kiếm</h3>
-               <Button variant="outline" size="sm" onClick={resetFiltersAndSearch} title="Reset Filters and Search">
+               <h3 className="text-lg font-semibold">Bộ lọc</h3>
+               <Button variant="outline" size="sm" onClick={resetFiltersAndSearch} title="Reset Filters">
                    <RotateCcw className="mr-1 h-4 w-4" /> Reset
                </Button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 items-end">
-               {/* Search Input */}
-               <div className="sm:col-span-2 md:col-span-1 lg:col-span-2 xl:col-span-1">
-                 <Label htmlFor="search">Tìm kiếm chung</Label>
-                 <div className="relative">
-                   <Input
-                     id="search"
-                     name="search"
-                     value={searchTerm}
-                     onChange={handleSearchInputChange}
-                     placeholder="Tìm mã key, email, ghi chú..."
-                     className="pr-8"
-                   />
-                   <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                 </div>
-               </div>
+            {/* Adjusted grid layout - Potentially more columns needed or adjust spans */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
+               {/* Removed General Search Input - Fully removing the commented block */}
 
-               {/* Filter Inputs */}
+               {/* Filter Inputs - Reordered and Added Date/Import Source Filters */}
                <div>
                  <Label htmlFor="activationCode">Mã Key</Label>
                  <Input id="activationCode" name="activationCode" value={filters.activationCode || ''} onChange={handleFilterChange} placeholder="Lọc theo mã..."/>
                </div>
                <div>
                  <Label htmlFor="productId">Sản phẩm</Label>
-                 <Select name="productId" value={filters.productId?.toString() || 'all'} onValueChange={(value: string) => handleSelectFilterChange('productId', value)}>
-                   <SelectTrigger>
-                     <SelectValue placeholder="Tất cả sản phẩm" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="all">Tất cả sản phẩm</SelectItem>
-                     {products.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
-                   </SelectContent>
-                 </Select>
+                 <ProductSearchInput
+                    // Pass the product ID string to value
+                    value={filters.productId}
+                    // Ensure ProductSearchInput onChange handles the object correctly
+                    onChange={(selected) => handleProductFilterChange(selected ? { id: selected.id, name: selected.name } : undefined)}
+                    initialProductName={initialProductName}
+                    placeholder="Lọc theo sản phẩm..."
+                    className="w-full"
+                 />
                </div>
-                <div>
+               {/* Add Import Source Filter */}
+               <div>
+                 <Label htmlFor="importSourceFilter">Nguồn Nhập</Label>
+                 <ImportSourceSearchInput
+                    value={filterImportSource} // Bind to the object state for display
+                    onChange={handleImportSourceFilterChange}
+                    placeholder="Lọc theo nguồn nhập..."
+                    className="w-full"
+                 />
+               </div>
+               <div>
                  <Label htmlFor="status">Trạng thái</Label>
                  <Select name="status" value={filters.status || 'all'} onValueChange={(value: string) => handleSelectFilterChange('status', value)}>
                    <SelectTrigger>
@@ -383,17 +383,46 @@ const KeysManagementPage = () => {
                  <Label htmlFor="userEmail">Email người dùng</Label>
                  <Input id="userEmail" name="userEmail" value={filters.userEmail || ''} onChange={handleFilterChange} placeholder="Lọc theo email..."/>
                </div>
-               {/* Cost Range */}
-                <div className="flex gap-2 items-end">
-                    <div>
-                        <Label htmlFor="minCost">Giá nhập từ</Label>
-                        <Input id="minCost" name="minCost" type="number" value={filters.minCost ?? ''} onChange={handleNumericFilterChange} placeholder="Từ"/>
-                    </div>
-                    <div>
-                        <Label htmlFor="maxCost">đến</Label>
-                        <Input id="maxCost" name="maxCost" type="number" value={filters.maxCost ?? ''} onChange={handleNumericFilterChange} placeholder="Đến"/>
-                    </div>
-                </div>
+               {/* Created At Date Range */}
+               <div className="md:col-span-2 grid grid-cols-2 gap-2">
+                   <div>
+                       <Label htmlFor="createdAtFrom">Ngày tạo từ</Label>
+                       <Input id="createdAtFrom" name="createdAtFrom" type="date" value={filters.createdAtFrom || ''} onChange={handleFilterChange} />
+                   </div>
+                   <div>
+                       <Label htmlFor="createdAtTo">đến</Label>
+                       <Input id="createdAtTo" name="createdAtTo" type="date" value={filters.createdAtTo || ''} onChange={handleFilterChange} />
+                   </div>
+               </div>
+
+               {/* Used At Date Range */}
+               <div className="md:col-span-2 grid grid-cols-2 gap-2">
+                   <div>
+                       <Label htmlFor="usedAtFrom">Ngày bán từ</Label>
+                       <Input id="usedAtFrom" name="usedAtFrom" type="date" value={filters.usedAtFrom || ''} onChange={handleFilterChange} />
+                   </div>
+                   <div>
+                       <Label htmlFor="usedAtTo">đến</Label>
+                       <Input id="usedAtTo" name="usedAtTo" type="date" value={filters.usedAtTo || ''} onChange={handleFilterChange} />
+                   </div>
+               </div>
+
+               {/* Cost Range - potentially move to span 2 cols */}
+               <div className="md:col-span-2 grid grid-cols-2 gap-2 items-end">
+                   <div>
+                       <Label htmlFor="minCost">Giá nhập từ</Label>
+                       <Input id="minCost" name="minCost" type="number" value={filters.minCost ?? ''} onChange={handleNumericFilterChange} placeholder="Từ"/>
+                   </div>
+                   <div>
+                       <Label htmlFor="maxCost">đến</Label>
+                       <Input id="maxCost" name="maxCost" type="number" value={filters.maxCost ?? ''} onChange={handleNumericFilterChange} placeholder="Đến"/>
+                   </div>
+               </div>
+               {/* Note Filter Input - Moved here */}
+               <div>
+                 <Label htmlFor="note">Ghi chú</Label>
+                 <Input id="note" name="note" value={filters.note || ''} onChange={handleFilterChange} placeholder="Lọc theo ghi chú..."/>
+               </div>
              </div>
           </div>
 

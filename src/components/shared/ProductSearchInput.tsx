@@ -30,7 +30,7 @@ interface ProductSearchInputProps {
   className?: string;
 }
 
-type ProductOption = Pick<Product, 'id' | 'name'>;
+export type ProductOption = Pick<Product, 'id' | 'name'>;
 
 export const ProductSearchInput: React.FC<ProductSearchInputProps> = ({
   value,
@@ -48,6 +48,7 @@ export const ProductSearchInput: React.FC<ProductSearchInputProps> = ({
   const [selectedProductName, setSelectedProductName] = useState<string | null>(initialProductName ?? null);
 
   const popoverTriggerRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Effect to update display name when initialProductName or value changes
   useEffect(() => {
@@ -61,6 +62,16 @@ export const ProductSearchInput: React.FC<ProductSearchInputProps> = ({
       // This logic depends on whether the parent component can provide initialProductName reliably
     }
   }, [value, initialProductName]);
+
+  // Effect to focus input when popover opens
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
 
   // Effect to search when debounced term changes
   useEffect(() => {
@@ -147,10 +158,11 @@ export const ProductSearchInput: React.FC<ProductSearchInputProps> = ({
          className="w-full p-0" 
          style={{ width: popoverTriggerRef.current?.offsetWidth ? `${popoverTriggerRef.current.offsetWidth}px` : 'auto' }}
          align="start"
-         onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus hijack
+         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <Command shouldFilter={false}> {/* Disable default filtering */} 
           <CommandInput
+            ref={inputRef}
             placeholder={placeholder}
             value={searchTerm}
             onValueChange={setSearchTerm}

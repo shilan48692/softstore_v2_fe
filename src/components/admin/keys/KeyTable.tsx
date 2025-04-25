@@ -42,8 +42,8 @@ const getStatusBadgeVariant = (status: KeyStatus): "default" | "secondary" | "de
       return "default"; // Greenish/Blueish default
     case KeyStatus.SOLD:
       return "secondary"; // Grayish
-    case KeyStatus.USED:
-      return "destructive"; // Reddish
+    case KeyStatus.EXPORTED:
+      return "outline";
     default:
       return "outline";
   }
@@ -74,30 +74,32 @@ export const KeyTable: React.FC<KeyTableProps> = ({
           <TableHeader>
             <TableRow>
               <TableHead className="w-[40px]"><Skeleton className="h-5 w-5" /></TableHead> {/* Checkbox Skeleton */}
-              <TableHead><Skeleton className="h-5 w-32" /></TableHead>
-              <TableHead><Skeleton className="h-5 w-24" /></TableHead>
-              <TableHead><Skeleton className="h-5 w-20" /></TableHead>
-              <TableHead><Skeleton className="h-5 w-32" /></TableHead>
-              <TableHead><Skeleton className="h-5 w-24" /></TableHead>
-              <TableHead><Skeleton className="h-5 w-16" /></TableHead>
-              <TableHead><Skeleton className="h-5 w-24" /></TableHead>
-              <TableHead><Skeleton className="h-5 w-24" /></TableHead>
-              <TableHead><Skeleton className="h-5 w-12" /></TableHead>
+              <TableHead><Skeleton className="h-5 w-32" /></TableHead> {/* Mã Key */}
+              <TableHead><Skeleton className="h-5 w-24" /></TableHead> {/* Sản phẩm */}
+              <TableHead><Skeleton className="h-5 w-24" /></TableHead> {/* Nguồn Nhập */}
+              <TableHead><Skeleton className="h-5 w-20" /></TableHead> {/* Trạng thái */}
+              <TableHead><Skeleton className="h-5 w-32" /></TableHead> {/* Email */}
+              <TableHead><Skeleton className="h-5 w-24" /></TableHead> {/* Ghi chú */}
+              <TableHead><Skeleton className="h-5 w-16" /></TableHead> {/* Giá nhập */}
+              <TableHead><Skeleton className="h-5 w-24" /></TableHead> {/* Ngày tạo */}
+              <TableHead><Skeleton className="h-5 w-24" /></TableHead> {/* Ngày sử dụng */}
+              <TableHead><Skeleton className="h-5 w-12" /></TableHead> {/* Hành động */}
             </TableRow>
           </TableHeader>
           <TableBody>
             {[...Array(5)].map((_, index) => (
               <TableRow key={`skeleton-${index}`}>
-                 <TableCell><Skeleton className="h-4 w-4" /></TableCell> {/* Checkbox Skeleton */}
-                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                 <TableCell><Skeleton className="h-4 w-4" /></TableCell> {/* Checkbox */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Mã Key */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Sản phẩm */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Nguồn Nhập */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Trạng thái */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Email */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Ghi chú */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Giá nhập */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Ngày tạo */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Ngày sử dụng */}
+                <TableCell><Skeleton className="h-4 w-full" /></TableCell>{/* Hành động */}
               </TableRow>
             ))}
           </TableBody>
@@ -125,6 +127,7 @@ export const KeyTable: React.FC<KeyTableProps> = ({
             </TableHead>
             <TableHead>Mã Key</TableHead>
             <TableHead>Sản phẩm</TableHead>
+            <TableHead>Nguồn Nhập</TableHead>
             <TableHead>Trạng thái</TableHead>
             <TableHead>Email người dùng</TableHead>
             <TableHead>Ghi chú</TableHead>
@@ -146,6 +149,7 @@ export const KeyTable: React.FC<KeyTableProps> = ({
                </TableCell>
               <TableCell className="font-medium">{key.activationCode}</TableCell>
               <TableCell>{key.product?.name || key.productId}</TableCell>
+              <TableCell>{key.importSource?.name || '-'}</TableCell>
               <TableCell>
                 <Badge variant={getStatusBadgeVariant(key.status)}>{key.status}</Badge>
               </TableCell>

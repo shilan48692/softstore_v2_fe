@@ -299,6 +299,8 @@ export interface ActivationKey {
   createdAt: string; // ISO Date string
   updatedAt: string; // ISO Date string
   usedAt?: string | null; // Added usedAt field
+  importSourceId?: string; // Add importSourceId for filtering
+  importSource?: ImportSource | null; // Add importSource object
 }
 
 export interface SearchParams {
@@ -311,6 +313,11 @@ export interface SearchParams {
   note?: string;
   minCost?: number;
   maxCost?: number;
+  createdAtFrom?: string;
+  createdAtTo?: string;
+  usedAtFrom?: string;
+  usedAtTo?: string;
+  importSourceId?: string; // Add importSourceId for filtering
   sortBy?: string; // e.g., 'createdAt'
   sortOrder?: 'asc' | 'desc';
 }
@@ -333,6 +340,7 @@ export const AddKeySchema = z.object({
     z.number().min(0, "Giá nhập phải lớn hơn hoặc bằng 0").nullable().optional() // Allow null and optional
   ),
   note: z.string().optional(),
+  importSourceId: z.string().uuid("ID Nguồn nhập không hợp lệ").optional(), // Add optional importSourceId
 });
 
 export type AddKeyInput = z.infer<typeof AddKeySchema>;
@@ -345,6 +353,7 @@ export const EditKeySchema = z.object({
     z.number().min(0, "Giá nhập phải lớn hơn hoặc bằng 0").nullable().optional()
   ),
   note: z.string().optional(),
+  importSourceId: z.string().uuid("ID Nguồn nhập không hợp lệ").nullable().optional(), // Add optional nullable importSourceId
   // Keep productId and activationCode as read-only or handled separately if needed
   // productId: z.string().optional(),
   // activationCode: z.string().optional(),
@@ -362,6 +371,7 @@ export const BulkCreateKeysSchema = z.object({
     z.number().min(0, "Giá nhập phải lớn hơn hoặc bằng 0").nullable().optional()
   ),
   note: z.string().optional(),
+  importSourceId: z.string().uuid("ID Nguồn nhập không hợp lệ").optional(), // Add optional importSourceId
 });
 
 export type BulkCreateKeysInput = z.infer<typeof BulkCreateKeysSchema>;
@@ -435,6 +445,75 @@ export const keyApi = {
       throw error; 
     }
   },
+};
+
+// --- Import Source Types and API ---
+// Assuming ImportSource has at least id and name
+export interface ImportSource {
+  id: string;
+  name: string;
+  contactLink?: string | null; // Example optional field
+  // Add other fields if available/needed
+}
+
+export interface ImportSourceSearchParams {
+  name?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedImportSourcesResponse {
+  data: ImportSource[];
+  meta: PaginationMeta; // Reuse PaginationMeta from products
+}
+
+export const importSourceApi = {
+  search: async (params: ImportSourceSearchParams): Promise<PaginatedImportSourcesResponse> => {
+    try {
+      // Filter out undefined/empty params (like product search)
+      const filteredParams = Object.entries(params || {})
+        .filter(([_, value]) => value !== undefined && value !== '')
+        .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+
+      console.log("[API] Searching import sources with params:", filteredParams);
+      const response = await apiClient.get<PaginatedImportSourcesResponse>('/admin/import-sources/search', {
+        params: filteredParams,
+      });
+      console.log("[API] Import source search response received:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error searching import sources:", error);
+      // Return empty paginated structure on error
+      return { data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } };
+    }
+  },
+  // Add missing CRUD operations
+  create: async (data: Omit<ImportSource, 'id'>): Promise<ImportSource> => {
+     try {
+       const response = await apiClient.post<ImportSource>('/admin/import-sources', data);
+       return response.data;
+     } catch (error) {
+       console.error("Error creating import source:", error);
+       throw error;
+     }
+   },
+   update: async (id: string, data: Partial<Omit<ImportSource, 'id'>>): Promise<ImportSource> => {
+     try {
+       const response = await apiClient.patch<ImportSource>(`/admin/import-sources/${id}`, data);
+       return response.data;
+     } catch (error) {
+       console.error(`Error updating import source ${id}:`, error);
+       throw error;
+     }
+   },
+   delete: async (id: string): Promise<void> => {
+     try {
+       await apiClient.delete(`/admin/import-sources/${id}`);
+     } catch (error) {
+       console.error(`Error deleting import source ${id}:`, error);
+       throw error;
+     }
+   },
 };
 
 export default apiClient; 
