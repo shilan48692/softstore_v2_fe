@@ -36,7 +36,9 @@ import {
 } from "@/components/ui/form";
 
 import { keyApi, ActivationKey, AddKeyInput, AddKeySchema, EditKeyInput, EditKeySchema, KeyStatus } from '@/services/api';
+import { BulkCreateKeysInput, BulkCreateKeysSchema } from '@/services/api';
 import { Product } from '@/services/api'; // Import Product type
+import { ProductSearchInput } from '@/components/shared/ProductSearchInput';
 
 interface KeyDialogProps {
   isOpen: boolean;
@@ -48,7 +50,10 @@ interface KeyDialogProps {
 
 // Schema for the form's internal shape (cost as string)
 const KeyFormSchema = z.object({
-    activationCode: z.string().min(1, "Mã key không được để trống"),
+    // Use a different name for the textarea input in add mode
+    activationCodesInput: z.string().min(1, "Cần nhập ít nhất một mã key").optional(), 
+    // Keep original for edit mode display (won't be in form state directly if disabled)
+    activationCode: z.string().optional(), 
     productId: z.string().min(1, "Vui lòng chọn sản phẩm"),
     status: z.nativeEnum(KeyStatus),
     // Cost is a string in the form, allow empty string
@@ -65,16 +70,18 @@ export const KeyDialog: React.FC<KeyDialogProps> = ({ isOpen, onClose, onSuccess
   const isEditMode = !!keyData;
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Use KeyFormSchema for the resolver, potentially picking fields for edit mode
-  // Note: Edit mode validation is simpler here as we parse fully in onSubmit
-  // We mainly need the shape for the resolver.
-  // If stricter edit validation needed, we could `.pick` here too.
-  const formResolverSchema = KeyFormSchema; // Use the schema matching form shape
+  // Find initial product name for edit mode
+  const initialProductName = isEditMode && keyData?.productId 
+      ? products.find(p => p.id === keyData.productId)?.name
+      : undefined;
 
   const form = useForm<KeyFormShape>({
-    resolver: zodResolver(formResolverSchema), // Use the form-specific schema
+    resolver: zodResolver(KeyFormSchema), // Use the form-specific schema
     defaultValues: {
-      activationCode: keyData?.activationCode ?? '',
+      // Set codes input only if NOT in edit mode
+      activationCodesInput: !isEditMode ? '' : undefined, 
+      // Set activationCode only IF in edit mode for display
+      activationCode: isEditMode ? keyData?.activationCode : undefined, 
       productId: keyData?.productId ?? '',
       status: keyData?.status ?? KeyStatus.AVAILABLE,
       cost: keyData?.cost === null || keyData?.cost === undefined ? '' : String(keyData.cost), // Cost as string
@@ -85,7 +92,8 @@ export const KeyDialog: React.FC<KeyDialogProps> = ({ isOpen, onClose, onSuccess
   useEffect(() => {
     if (isOpen) {
       form.reset({
-        activationCode: keyData?.activationCode ?? '',
+        activationCodesInput: !isEditMode ? '' : undefined,
+        activationCode: isEditMode ? keyData?.activationCode : undefined,
         productId: keyData?.productId ?? '',
         status: keyData?.status ?? KeyStatus.AVAILABLE,
         cost: keyData?.cost === null || keyData?.cost === undefined ? '' : String(keyData.cost),
@@ -109,16 +117,38 @@ export const KeyDialog: React.FC<KeyDialogProps> = ({ isOpen, onClose, onSuccess
         await keyApi.update(keyData.id, editPayload);
         toast.success('Cập nhật key thành công!');
       } else {
-         // Parse with AddKeySchema (from api.ts) for full validation & type conversion for API
-         const addPayload = AddKeySchema.parse({
-            activationCode: values.activationCode,
+        // ---> Handle Bulk Key Creation
+        if (!values.activationCodesInput) {
+            form.setError('activationCodesInput', { message: 'Cần nhập ít nhất một mã key' });
+            setIsSubmitting(false);
+            return;
+        }
+
+        const codesArray = values.activationCodesInput
+          .split('\n')
+          .map(code => code.trim())
+          .filter(Boolean); // Remove empty lines
+
+        if (codesArray.length === 0) {
+            form.setError('activationCodesInput', { message: 'Không tìm thấy mã key hợp lệ nào sau khi xử lý' });
+            setIsSubmitting(false);
+            return;
+        }
+
+        const bulkPayload: BulkCreateKeysInput = {
             productId: values.productId,
+            activationCodes: codesArray,
             status: values.status,
-            cost: values.cost, // AddKeySchema handles string -> number/null conversion
+            cost: values.cost, // Schema handles string -> number/null
             note: values.note,
-        });
-        await keyApi.create(addPayload);
-        toast.success('Thêm key mới thành công!');
+        };
+
+        // Validate payload before sending (optional here if validated in api.ts)
+        // const validationResult = BulkCreateKeysSchema.safeParse(bulkPayload);
+        // if (!validationResult.success) { ... handle validation errors ... }
+
+        const result = await keyApi.createBulk(bulkPayload); // Call the new bulk API function
+        toast.success(`Thêm thành công ${result.count} key mới!`);
       }
       onSuccess();
       onClose();
@@ -160,44 +190,57 @@ export const KeyDialog: React.FC<KeyDialogProps> = ({ isOpen, onClose, onSuccess
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField
-              control={form.control}
-              name="activationCode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mã Key <span className="text-red-500">*</span></FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nhập mã key..." {...field} disabled={isEditMode} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Conditionally render Input (Edit) or Textarea (Add) */}
+            {isEditMode ? (
+                <FormField
+                  control={form.control} 
+                  name="activationCode" // Use the dedicated field for edit mode display
+                  render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mã Key</FormLabel>
+                        <FormControl>
+                            {/* Display the original code, maybe use Input disabled or just text */}
+                            <Input {...field} disabled value={keyData?.activationCode ?? ''} /> 
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                  )}
+                />
+             ) : (
+                 <FormField
+                    control={form.control}
+                    name="activationCodesInput" // Use the textarea field for add mode
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mã Key (mỗi key một dòng) <span className="text-red-500">*</span></FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="KEY123...\nABC456...\nXYZ789..."
+                            {...field} 
+                            rows={5} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+            )}
 
             <FormField
               control={form.control}
               name="productId"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Sản Phẩm <span className="text-red-500">*</span></FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value}
-                    disabled={isEditMode || products.length === 0}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn sản phẩm..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {products.map(product => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ProductSearchInput
+                      value={field.value}
+                      onChange={(selectedOption) => {
+                        field.onChange(selectedOption ? selectedOption.id : undefined);
+                      }}
+                      initialProductName={initialProductName}
+                      placeholder="Tìm và chọn sản phẩm..."
+                      disabled={isEditMode}
+                  />
                   <FormMessage />
                 </FormItem>
               )}

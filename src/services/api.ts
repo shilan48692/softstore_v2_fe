@@ -352,6 +352,20 @@ export const EditKeySchema = z.object({
 
 export type EditKeyInput = z.infer<typeof EditKeySchema>;
 
+// ---> Schema and Type for Bulk Key Creation
+export const BulkCreateKeysSchema = z.object({
+  productId: z.string().uuid("ID sản phẩm không hợp lệ"),
+  activationCodes: z.array(z.string().min(1, "Mã key không được để trống")).min(1, "Cần ít nhất một mã key"),
+  status: z.nativeEnum(KeyStatus).optional(), // Optional, backend might default
+  cost: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+    z.number().min(0, "Giá nhập phải lớn hơn hoặc bằng 0").nullable().optional()
+  ),
+  note: z.string().optional(),
+});
+
+export type BulkCreateKeysInput = z.infer<typeof BulkCreateKeysSchema>;
+
 // --- Key Management API Functions ---
 
 export const keyApi = {
@@ -405,6 +419,20 @@ export const keyApi = {
     } catch (error) {
       console.error(`Error deleting multiple keys:`, error);
       throw error;
+    }
+  },
+
+  // ---> NEW: Function to create multiple keys
+  createBulk: async (data: BulkCreateKeysInput): Promise<{ count: number }> => { // Assuming API returns count
+    try {
+      // Validate input data using Zod schema before sending
+      const validatedData = BulkCreateKeysSchema.parse(data);
+      const response = await apiClient.post<{ count: number }>('/admin/keys/bulk-create', validatedData);
+      return response.data; // Assuming response format { count: number }
+    } catch (error) {
+      console.error("Error bulk creating keys:", error);
+      // Re-throw Zod errors or other errors for handling in the component
+      throw error; 
     }
   },
 };
